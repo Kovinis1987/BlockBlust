@@ -1,0 +1,18 @@
+{
+  "name": "location-editor",
+  "version": "1.0.0",
+  "description": "Редактор настроек локации",
+  "main": "main.js",
+  "panel": {
+    "main": "panel/index.js",
+    "type": "dockable",
+    "title": "Location Editor",
+    "width": 400,
+    "height": 600
+  },
+  "menus": {
+    "panel/Location Editor": {
+      "message": "open"
+    }
+  }
+}
