@@ -5,7 +5,7 @@ const path = require('path');
 
 // Путь к файлу: проект/assets/configs/levels.json
 const PROJECT_PATH = Editor.Project.path;
-const CONFIG_DIR = path.join(PROJECT_PATH, 'assets', 'configs');
+const CONFIG_DIR = path.join(PROJECT_PATH, 'assets', 'resources' ,'configs');
 const FILE_PATH = path.join(CONFIG_DIR, 'levels.json');
 
 Editor.Panel.extend({

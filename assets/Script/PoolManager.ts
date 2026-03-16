@@ -16,7 +16,7 @@ export default class PoolManager extends cc.Component {
         PoolManager._instance = this;
         // Инициализируем пул
         this._tilePool = new cc.NodePool();
-
+        console.log("PoolManager onLoad")
         // Предварительно создаем 50-100 тайлов (зависит от размера сетки),
         // чтобы не было задержки при первом старте уровня
         const initialCount = 64;
