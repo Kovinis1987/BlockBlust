@@ -116,8 +116,8 @@
       "__type__": "TypedArray",
       "ctor": "Float64Array",
       "array": [
-        141.6,
-        1455.2,
+        0,
+        0,
         0,
         0,
         0,
@@ -179,7 +179,7 @@
       "__id__": 1
     },
     "asset": {
-      "__id__": 0
+      "__uuid__": "e89e8f44-e2a9-44d8-b287-3848eb3c96e1"
     },
     "fileId": "28sMoS1c1I8bIWMdeM+t7a",
     "sync": false
@@ -217,7 +217,7 @@
       "__id__": 1
     },
     "asset": {
-      "__id__": 0
+      "__uuid__": "e89e8f44-e2a9-44d8-b287-3848eb3c96e1"
     },
     "fileId": "51jPR/85VL9bFQ9s7r+Cqo",
     "sync": false
