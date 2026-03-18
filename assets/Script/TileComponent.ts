@@ -6,67 +6,59 @@ export default class TileComponent extends cc.Component {
     sprite: cc.Sprite = null;
 
     @property([cc.SpriteFrame])
-    colors: cc.SpriteFrame[] = []; // Закинь сюда спрайты разных цветов в инспекторе
+    colors: cc.SpriteFrame[] = [];
 
     private _type: number = -1;
     private _gridPos: cc.Vec2 = cc.v2(0, 0);
+    private _clickHandler: Function = null;
 
-    // Свойства для доступа извне
     get type(): number { return this._type; }
     get gridPos(): cc.Vec2 { return this._gridPos; }
 
-    /**
-     * Инициализация тайла
-     * @param type ID цвета
-     * @param x координата в сетке
-     * @param y координата в сетке
-     */
-    public init(type: number, x: number, y: number) {
-        this._type = type;
-        this._gridPos = cc.v2(x, y);
+    onLoad() {
+        // Делаем ноду кликабельной напрямую
+        this.node.on(cc.Node.EventType.TOUCH_END, this.onClick, this);
+    }
 
-        // Устанавливаем спрайт согласно типу
-        if (this.colors[type]) {
-            this.sprite.spriteFrame = this.colors[type];
+    init(id: number, r: number, c: number, clickCallback: Function) {
+        this._type = id;
+        this._gridPos = cc.v2(c, r);
+        this._clickHandler = clickCallback;
+
+        const spriteIndex = id - 2;
+        if (this.sprite && this.colors[spriteIndex]) {
+            this.sprite.spriteFrame = this.colors[spriteIndex];
+        }
+
+        this.node.scale = 1;
+        this.node.opacity = 255;
+    }
+
+    private onClick() {
+        if (this._clickHandler) {
+            this._clickHandler(this._gridPos.y, this._gridPos.x);
         }
     }
 
-    public moveTo(newX: number, newY: number, worldPos: cc.Vec2) {
-        this._gridPos = cc.v2(newX, newY);
-
+    public moveTo(r: number, c: number, targetPos: cc.Vec2) {
+        this._gridPos = cc.v2(c, r);
         cc.tween(this.node)
-            // Используем cc.v3, чтобы избежать ошибки TS2741
-            .to(0.2, { position: cc.v3(worldPos.x, worldPos.y, 0) }, { easing: 'sineOut' })
+            .to(0.2, { position: cc.v3(targetPos.x, targetPos.y, 0) }, { easing: 'sineOut' })
             .start();
     }
 
-    public getCoord() {
-
+    public destroyTile(callback: Function) {
+        cc.tween(this.node)
+            .to(0.15, { scale: 0, opacity: 0 }, { easing: 'backIn' })
+            .call(() => callback())
+            .start();
     }
 
-    /**
-     * Эффект при клике (если группа меньше 2)
-     */
     public shake() {
         cc.tween(this.node)
             .by(0.05, { x: 5 })
             .by(0.1, { x: -10 })
             .by(0.05, { x: 5 })
-            .start();
-    }
-
-    /**
-     * Анимация исчезновения
-     */
-    public destroyTile(callback: Function) {
-        cc.tween(this.node)
-            .to(0.15, { scale: 0, opacity: 0 }, { easing: 'backIn' })
-            .call(() => {
-                // Сбрасываем состояние для NodePool
-                this.node.scale = 1;
-                this.node.opacity = 255;
-                callback();
-            })
             .start();
     }
 }

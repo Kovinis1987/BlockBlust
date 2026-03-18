@@ -14,7 +14,7 @@ export default class GridModel {
         for (let r = 0; r < this.rows; r++) {
             this.grid[r] = [];
             for (let c = 0; c < this.cols; c++) {
-                this.grid[r][c] = -1; // -1 означает пустую ячейку
+                this.grid[r][c] = -1;
             }
         }
     }
@@ -27,24 +27,20 @@ export default class GridModel {
         return this.grid[r][c];
     }
 
-    /**
-     * Поиск группы одного цвета (BFS)
-     */
     public findGroup(row: number, col: number): { r: number, c: number }[] {
         const targetColor = this.grid[row][col];
-        if (targetColor === -1) return [];
+        // Препятствия (1) и пустые (-1) не образуют группы для взрыва
+        if (targetColor === -1 || targetColor === 1) return [];
 
         const group: { r: number, c: number }[] = [];
         const queue: { r: number, c: number }[] = [{ r: row, c: col }];
         const visited = new Set<string>();
-
         visited.add(`${row},${col}`);
 
         while (queue.length > 0) {
-            const cell = queue.shift();
+            const cell = queue.shift()!;
             group.push(cell);
 
-            // Соседи: вверх, вниз, влево, вправо
             const neighbors = [
                 { r: cell.r + 1, c: cell.c }, { r: cell.r - 1, c: cell.c },
                 { r: cell.r, c: cell.c + 1 }, { r: cell.r, c: cell.c - 1 }
@@ -62,36 +58,39 @@ export default class GridModel {
         return group;
     }
 
-    /**
-     * Пометка ячеек как пустых после взрыва
-     */
     public clearCells(group: { r: number, c: number }[]) {
         group.forEach(cell => {
-            this.grid[cell.r][cell.c] = -1;
+            // Очищаем только если это не препятствие (на всякий случай)
+            if (this.grid[cell.r][cell.c] !== 1) {
+                this.grid[cell.r][cell.c] = -1;
+            }
         });
     }
 
     /**
-     * Логика перемещения тайлов вниз (гравитация)
-     * Возвращает массив перемещений {откуда -> куда}
+     * Гравитация: тайлы падают только в пустые ячейки (-1),
+     * пролетая мимо препятствий (1).
      */
     public processFalling(): { from: { r: number, c: number }, to: { r: number, c: number } }[] {
         const movements = [];
         for (let c = 0; c < this.cols; c++) {
-            let emptySpots = 0;
             for (let r = 0; r < this.rows; r++) {
+                // Если нашли пустую ячейку, ищем ближайший тайл ВЫШЕ неё
                 if (this.grid[r][c] === -1) {
-                    emptySpots++;
-                } else if (emptySpots > 0) {
-                    // Перемещаем значение в модели
-                    const tileType = this.grid[r][c];
-                    this.grid[r - emptySpots][c] = tileType;
-                    this.grid[r][c] = -1;
-
-                    movements.push({
-                        from: { r, c },
-                        to: { r: r - emptySpots, c }
-                    });
+                    for (let nextR = r + 1; nextR < this.rows; nextR++) {
+                        const tileType = this.grid[nextR][c];
+                        if (tileType === 1) continue; // Пропускаем препятствие
+                        if (tileType !== -1) {
+                            // Нашли тайл, перемещаем его в текущую пустую ячейку r
+                            this.grid[r][c] = tileType;
+                            this.grid[nextR][c] = -1;
+                            movements.push({
+                                from: { r: nextR, c },
+                                to: { r, c }
+                            });
+                            break; // Тайл упал, переходим к следующей ячейке r
+                        }
+                    }
                 }
             }
         }
@@ -99,15 +98,15 @@ export default class GridModel {
     }
 
     /**
-     * Заполнение пустых мест новыми случайными тайлами
-     * Возвращает список новых тайлов для отрисовки
+     * Заполнение: создаем новые тайлы (ID 2-5) только в пустых ячейках (-1)
      */
     public fillEmptyCells(): { r: number, c: number, type: number }[] {
         const newTiles = [];
         for (let r = 0; r < this.rows; r++) {
             for (let c = 0; c < this.cols; c++) {
                 if (this.grid[r][c] === -1) {
-                    const randomType = Math.floor(Math.random() * 5); // 5 цветов
+                    // Генерируем ID от 2 до 5 (ваши 4 цвета)
+                    const randomType = Math.floor(Math.random() * 4) + 2;
                     this.grid[r][c] = randomType;
                     newTiles.push({ r, c, type: randomType });
                 }
@@ -115,4 +114,45 @@ export default class GridModel {
         }
         return newTiles;
     }
+
+    public hasAvailableMoves(minGroup: number): boolean {
+        for (let r = 0; r < this.rows; r++) {
+            for (let c = 0; c < this.cols; c++) {
+                const type = this.grid[r][c];
+                // Если это бустер (6-10), ход есть
+                if (type >= 6 && type <= 10) return true;
+                // Если это обычный тайл, проверяем размер группы
+                if (type >= 2 && this.findGroup(r, c).length >= minGroup) return true;
+            }
+        }
+        return false;
+    }
+
+    public shuffleOnlyColors() {
+        // Собираем все цветовые тайлы (ID 2-5), перемешиваем и расставляем обратно
+        let colors: number[] = [];
+        for (let r = 0; r < this.rows; r++) {
+            for (let c = 0; c < this.cols; c++) {
+                if (this.grid[r][c] >= 2 && this.grid[r][c] <= 5) {
+                    colors.push(this.grid[r][c]);
+                }
+            }
+        }
+
+        // Алгоритм Фишера-Йетса
+        for (let i = colors.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [colors[i], colors[j]] = [colors[j], colors[i]];
+        }
+
+        let idx = 0;
+        for (let r = 0; r < this.rows; r++) {
+            for (let c = 0; c < this.cols; c++) {
+                if (this.grid[r][c] >= 2 && this.grid[r][c] <= 5) {
+                    this.grid[r][c] = colors[idx++];
+                }
+            }
+        }
+    }
+
 }

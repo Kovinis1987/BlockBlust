@@ -16,6 +16,7 @@ export default class GameController extends cc.Component {
     private isProcessing: boolean = false;
     private tileSizeX: number = 100;
     private tileSizeY: number = 112;
+    private shuffleAttempts: number = 3;
 
     // Сохраняем текущие размеры поля, чтобы методы ниже их видели
     private _currentRows: number = 8;
@@ -44,14 +45,33 @@ export default class GameController extends cc.Component {
         this._currentRows = rows;
         this._currentCols = cols;
         this.model = new GridModel(rows, cols);
-
         this.gridContainer.removeAllChildren();
 
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                const colorID = tilesData ? tilesData[r * cols + c] : Math.floor(Math.random() * 5);
-                this.model.setTile(r, c, colorID);
-                this.spawnTile(r, c, colorID);
+                let rawValue = tilesData ? tilesData[r * cols + c] : 0;
+                let finalType: number;
+
+                if (rawValue === 0) {
+                    // Рандом от 1 до 4 (согласно вашему списку)
+                    finalType = Math.floor(Math.random() * 4) + 2;
+                } else if (rawValue === 1) {
+                    // Препятствие: записываем в модель, но визуально можем не спавнить
+                    // или спавнить отдельный префаб "блока"
+                    this.model.setTile(r, c, 1);
+                    this.spawnObstacle(r, c); // Опционально
+                    continue;
+                } else if (rawValue >= 2 && rawValue <= 5) {
+                    // Прямое соответствие 2->1, 3->2 и т.д. в префабе?
+                    // Обычно удобнее хранить ID как есть:
+                    finalType = rawValue;
+                } else {
+                    // Бустеры (6-9) пока пропускаем или ставим пустышки
+                    continue;
+                }
+
+                this.model.setTile(r, c, finalType);
+                this.spawnTile(r, c, finalType);
             }
         }
     }
@@ -64,7 +84,8 @@ export default class GameController extends cc.Component {
         tileNode.setPosition(cc.v3(pos.x, pos.y, 0));
 
         const comp = tileNode.getComponent(TileComponent);
-        comp.init(colorID, r, c);
+        // Передаем метод обработки клика прямо в тайл
+        comp.init(colorID, r, c, (row, col) => this.tryBlast(row, col));
     }
 
     private getScreenPosition(r: number, c: number): cc.Vec2 {
@@ -76,23 +97,39 @@ export default class GameController extends cc.Component {
     private handleTouch(event: cc.Event.EventTouch) {
         if (this.isProcessing || !this.model) return;
 
+        // Получаем локальную точку относительно ЦЕНТРА контейнера
         const worldPoint = event.getLocation();
         const localPoint = this.gridContainer.convertToNodeSpaceAR(worldPoint);
 
-        const offsetX = (this._currentCols - 1) * this.tileSizeX / 2;
-        const offsetY = (this._currentRows - 1) * this.tileSizeX / 2;
+        // Ширина и высота всей сетки
+        const totalWidth = this._currentCols * this.tileSizeX;
+        const totalHeight = this._currentRows * this.tileSizeY;
 
-        const c = Math.round((localPoint.x + offsetX) / this.tileSizeX);
-        const r = Math.round((localPoint.y + offsetY) / this.tileSizeY);
+        // Переводим координату так, чтобы (0,0) был в ЛЕВОМ НИЖНЕМ углу сетки
+        const relativeX = localPoint.x + totalWidth / 2;
+        const relativeY = localPoint.y + totalHeight / 2;
 
+        // Вычисляем индексы через floor (целая часть)
+        const c = Math.floor(relativeX / this.tileSizeX);
+        const r = Math.floor(relativeY / this.tileSizeY);
+
+        // Проверка границ и клик
         if (r >= 0 && r < this._currentRows && c >= 0 && c < this._currentCols) {
+            console.log(`Clicked on: row ${r}, col ${c}`); // Для отладки
             this.tryBlast(r, c);
         }
     }
 
     private tryBlast(r: number, c: number) {
+        if (this.isProcessing) return;
+
         const group = this.model.findGroup(r, c);
-        if (group.length < 2) return;
+
+        // Условие: только если 3 и более рядом
+        if (group.length < 3) {
+            this.getNodeAt(r, c).getComponent(TileComponent).shake();
+            return;
+        }
 
         this.isProcessing = true;
         const nodesToDestroy = this.getNodesByCoords(group);
@@ -105,9 +142,39 @@ export default class GameController extends cc.Component {
                 count++;
                 if (count === nodesToDestroy.length) {
                     this.processGridPhysics();
+                    // После падения проверяем, остались ли ходы
+                    this.scheduleOnce(() => this.checkPossibleMoves(), 0.5);
                 }
             });
         });
+    }
+
+    private checkPossibleMoves() {
+        // Проверяем наличие групп >= 3 или бустеров (6-10)
+        const hasMoves = this.model.hasAvailableMoves(3);
+
+        if (!hasMoves) {
+            if (this.shuffleAttempts > 0) {
+                this.shuffleAttempts--;
+                console.log("No moves! Shuffling...");
+                this.shuffleGrid();
+            } else {
+                this.gameOver();
+            }
+        }
+    }
+
+    private shuffleGrid() {
+        this.model.shuffleOnlyColors(); // Метод в GridModel
+        this.gridContainer.children.forEach(node => {
+            const comp = node.getComponent(TileComponent);
+            const newType = this.model.getTile(comp.gridPos.y, comp.gridPos.x);
+            comp.init(newType, comp.gridPos.y, comp.gridPos.x, (r, c) => this.tryBlast(r, c));
+        });
+    }
+
+    private gameOver() {
+        console.log("GAME OVER - No more shuffles!");
     }
 
     private processGridPhysics() {
@@ -143,5 +210,9 @@ export default class GameController extends cc.Component {
             const cp = node.getComponent(TileComponent).gridPos;
             return cp.y === r && cp.x === c;
         });
+    }
+
+    private spawnObstacle(r: number, c: number) {
+        
     }
 }
