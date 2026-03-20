@@ -1,6 +1,7 @@
 import GridModel from "./GridModel";
 import TileComponent from "./TileComponent";
 import PoolManager from "./PoolManager";
+import GameOverWindow from "./GameOverWindow";
 
 const { ccclass, property } = cc._decorator;
 
@@ -12,19 +13,23 @@ export default class GameController extends cc.Component {
     @property(cc.Integer)
     currentLevel: number = 0;
 
+    @property(GameOverWindow)
+    gameOverWindow: GameOverWindow = null;
+
+    private score: number = 0;
+    private movesLeft: number = 25;
+
     private model: GridModel = null;
     private isProcessing: boolean = false;
     private tileSizeX: number = 100;
     private tileSizeY: number = 112;
     private shuffleAttempts: number = 3;
 
-    // Сохраняем текущие размеры поля, чтобы методы ниже их видели
     private _currentRows: number = 8;
     private _currentCols: number = 8;
 
     onLoad() {
         this.loadLevelConfig();
-        // Подписка на клик один раз
         this.node.on(cc.Node.EventType.TOUCH_END, this.handleTouch, this);
     }
 
@@ -53,20 +58,14 @@ export default class GameController extends cc.Component {
                 let finalType: number;
 
                 if (rawValue === 0) {
-                    // Рандом от 1 до 4 (согласно вашему списку)
                     finalType = Math.floor(Math.random() * 4) + 2;
                 } else if (rawValue === 1) {
-                    // Препятствие: записываем в модель, но визуально можем не спавнить
-                    // или спавнить отдельный префаб "блока"
                     this.model.setTile(r, c, 1);
                     this.spawnObstacle(r, c); // Опционально
                     continue;
                 } else if (rawValue >= 2 && rawValue <= 5) {
-                    // Прямое соответствие 2->1, 3->2 и т.д. в префабе?
-                    // Обычно удобнее хранить ID как есть:
                     finalType = rawValue;
                 } else {
-                    // Бустеры (6-9) пока пропускаем или ставим пустышки
                     continue;
                 }
 
@@ -84,7 +83,6 @@ export default class GameController extends cc.Component {
         tileNode.setPosition(cc.v3(pos.x, pos.y, 0));
 
         const comp = tileNode.getComponent(TileComponent);
-        // Передаем метод обработки клика прямо в тайл
         comp.init(colorID, r, c, (row, col) => this.tryBlast(row, col));
     }
 
@@ -97,23 +95,18 @@ export default class GameController extends cc.Component {
     private handleTouch(event: cc.Event.EventTouch) {
         if (this.isProcessing || !this.model) return;
 
-        // Получаем локальную точку относительно ЦЕНТРА контейнера
         const worldPoint = event.getLocation();
         const localPoint = this.gridContainer.convertToNodeSpaceAR(worldPoint);
 
-        // Ширина и высота всей сетки
         const totalWidth = this._currentCols * this.tileSizeX;
         const totalHeight = this._currentRows * this.tileSizeY;
 
-        // Переводим координату так, чтобы (0,0) был в ЛЕВОМ НИЖНЕМ углу сетки
         const relativeX = localPoint.x + totalWidth / 2;
         const relativeY = localPoint.y + totalHeight / 2;
 
-        // Вычисляем индексы через floor (целая часть)
         const c = Math.floor(relativeX / this.tileSizeX);
         const r = Math.floor(relativeY / this.tileSizeY);
 
-        // Проверка границ и клик
         if (r >= 0 && r < this._currentRows && c >= 0 && c < this._currentCols) {
             console.log(`Clicked on: row ${r}, col ${c}`); // Для отладки
             this.tryBlast(r, c);
@@ -124,12 +117,10 @@ export default class GameController extends cc.Component {
         if (this.isProcessing) return;
 
         const group = this.model.findGroup(r, c);
+        if (group.length < 3) return;
 
-        // Условие: только если 3 и более рядом
-        if (group.length < 3) {
-            this.getNodeAt(r, c).getComponent(TileComponent).shake();
-            return;
-        }
+        this.movesLeft--;
+        this.score += group.length * 10;
 
         this.isProcessing = true;
         const nodesToDestroy = this.getNodesByCoords(group);
@@ -149,6 +140,30 @@ export default class GameController extends cc.Component {
         });
     }
 
+    private showLosePopup() {
+        this.gameOverWindow.show(
+            this.score,
+            () => this.handleContinue(),
+            () => this.restartLevel()
+        );
+    }
+
+    private handleContinue() {
+        this.movesLeft += 5;
+        this.shuffleAttempts = 1;
+        this.shuffleGrid();
+        this.isProcessing = false;
+    }
+
+    private restartLevel() {
+        this.score = 0;
+        this.movesLeft = 25;
+        this.shuffleAttempts = 3;
+
+        this.loadLevelConfig();
+        this.isProcessing = false;
+    }
+
     private checkPossibleMoves() {
         // Проверяем наличие групп >= 3 или бустеров (6-10)
         const hasMoves = this.model.hasAvailableMoves(3);
@@ -159,13 +174,13 @@ export default class GameController extends cc.Component {
                 console.log("No moves! Shuffling...");
                 this.shuffleGrid();
             } else {
-                this.gameOver();
+                this.showLosePopup();
             }
         }
     }
 
     private shuffleGrid() {
-        this.model.shuffleOnlyColors(); // Метод в GridModel
+        this.model.shuffleOnlyColors();
         this.gridContainer.children.forEach(node => {
             const comp = node.getComponent(TileComponent);
             const newType = this.model.getTile(comp.gridPos.y, comp.gridPos.x);
@@ -173,12 +188,7 @@ export default class GameController extends cc.Component {
         });
     }
 
-    private gameOver() {
-        console.log("GAME OVER - No more shuffles!");
-    }
-
     private processGridPhysics() {
-        // 1. Падение существующих
         const movements = this.model.processFalling();
         movements.forEach(move => {
             const node = this.getNodeAt(move.from.r, move.from.c);
@@ -188,16 +198,23 @@ export default class GameController extends cc.Component {
             }
         });
 
-        // 2. Спавн новых в пустые места (теперь методы не требуют аргументов)
         const news = this.model.fillEmptyCells();
         news.forEach(n => {
-            this.spawnTile(n.r, n.c, n.type);
+            const tileNode = PoolManager.instance.getTile();
+            tileNode.parent = this.gridContainer;
+
+            const finalPos = this.getScreenPosition(n.r, n.c);
+            const startY = (this._currentRows * this.tileSizeY / 2) + (n.r + 1) * 50;
+            tileNode.setPosition(cc.v3(finalPos.x, startY, 0));
+
+            const comp = tileNode.getComponent(TileComponent);
+            comp.init(n.type, n.r, n.c, (row, col) => this.tryBlast(row, col));
+            comp.moveTo(n.r, n.c, finalPos);
         });
 
-        this.scheduleOnce(() => { this.isProcessing = false; }, 0.3);
+        this.scheduleOnce(() => { this.isProcessing = false; }, 0.4);
     }
 
-    // Вспомогательные методы
     private getNodesByCoords(coords: {r:number, c:number}[]): cc.Node[] {
         return this.gridContainer.children.filter(node => {
             const cp = node.getComponent(TileComponent).gridPos;
