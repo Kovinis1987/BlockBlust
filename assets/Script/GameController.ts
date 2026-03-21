@@ -2,6 +2,8 @@ import GridModel from "./GridModel";
 import TileComponent from "./TileComponent";
 import PoolManager from "./PoolManager";
 import GameOverWindow from "./GameOverWindow";
+import DataService from "./DataService";
+import {GameState} from "./GameState";
 
 const { ccclass, property } = cc._decorator;
 
@@ -16,32 +18,46 @@ export default class GameController extends cc.Component {
     @property(GameOverWindow)
     gameOverWindow: GameOverWindow = null;
 
-    private score: number = 0;
-    private movesLeft: number = 25;
+    @property(cc.Prefab)
+    scorePopupPrefab: cc.Prefab = null;
+
+    @property(cc.Prefab)
+    obstaclePrefab: cc.Prefab = null;
+
 
     private model: GridModel = null;
     private isProcessing: boolean = false;
     private tileSizeX: number = 100;
     private tileSizeY: number = 112;
-    private shuffleAttempts: number = 3;
 
     private _currentRows: number = 8;
     private _currentCols: number = 8;
+    private data: DataService;
 
     onLoad() {
+        this.data = DataService.instance;
         this.loadLevelConfig();
         this.node.on(cc.Node.EventType.TOUCH_END, this.handleTouch, this);
+        this.data.eventTarget.on(DataService.EVT_RESTART, this.restartLevel, this);
+        this.data.eventTarget.on(DataService.EVT_CONTINUE, this.handleContinue, this);
     }
 
     private loadLevelConfig() {
         cc.resources.load('configs/levels', cc.JsonAsset, (err, res: cc.JsonAsset) => {
+            let data;
             if (err || !res.json || !res.json[this.currentLevel]) {
-                cc.warn("Level not found. Generating random 8x8...");
-                this.setupGame(8, 8, null);
-                return;
+                cc.warn("Level not found. Using defaults...");
+                data = { rows: 9, cols: 9, moves: 25, targetScore: 1500, tiles: null };
+            } else {
+                data = res.json[this.currentLevel];
             }
 
-            const data = res.json[this.currentLevel];
+            this.data.resetLevel(
+                this.currentLevel,
+                data.moves || 25,
+                data.targetScore || 1500
+            );
+
             this.setupGame(data.rows, data.cols, data.tiles);
         });
     }
@@ -114,13 +130,24 @@ export default class GameController extends cc.Component {
     }
 
     private tryBlast(r: number, c: number) {
-        if (this.isProcessing) return;
+        if (this.isProcessing || this.data.gameState !== GameState.PLAYING) return;
 
         const group = this.model.findGroup(r, c);
-        if (group.length < 3) return;
+        if (group.length < 3) {
+            this.getNodeAt(r, c).getComponent(TileComponent).shake();
+            return;
+        }
 
-        this.movesLeft--;
-        this.score += group.length * 10;
+        const points = group.length * 10;
+
+        const tileNode = this.getNodeAt(r, c);
+        if (tileNode) {
+            const worldPos = tileNode.parent.convertToWorldSpaceAR(tileNode.getPosition());
+            this.showScoreAnimation(worldPos, points);
+        }
+
+        this.data.useMove();
+        this.data.addScore(points);
 
         this.isProcessing = true;
         const nodesToDestroy = this.getNodesByCoords(group);
@@ -140,41 +167,32 @@ export default class GameController extends cc.Component {
         });
     }
 
-    private showLosePopup() {
-        this.gameOverWindow.show(
-            this.score,
-            () => this.handleContinue(),
-            () => this.restartLevel()
-        );
-    }
-
     private handleContinue() {
-        this.movesLeft += 5;
-        this.shuffleAttempts = 1;
-        this.shuffleGrid();
-        this.isProcessing = false;
+        this.data.resetLevel(
+            this.currentLevel,
+            this.data.moves + 5,
+            this.data.score
+        );
+
+        this.data.setGameState(GameState.PLAYING);
+
+        if (!this.model.hasAvailableMoves(3)) {
+            this.shuffleGrid();
+        }
     }
 
     private restartLevel() {
-        this.score = 0;
-        this.movesLeft = 25;
-        this.shuffleAttempts = 3;
-
+        this.gridContainer.removeAllChildren();
         this.loadLevelConfig();
         this.isProcessing = false;
     }
 
     private checkPossibleMoves() {
-        // Проверяем наличие групп >= 3 или бустеров (6-10)
-        const hasMoves = this.model.hasAvailableMoves(3);
-
-        if (!hasMoves) {
-            if (this.shuffleAttempts > 0) {
-                this.shuffleAttempts--;
-                console.log("No moves! Shuffling...");
+        if (!this.model.hasAvailableMoves(3)) {
+            if (this.data.useShuffle()) {
                 this.shuffleGrid();
             } else {
-                this.showLosePopup();
+                this.data.setGameState(GameState.LOST);
             }
         }
     }
@@ -217,19 +235,52 @@ export default class GameController extends cc.Component {
 
     private getNodesByCoords(coords: {r:number, c:number}[]): cc.Node[] {
         return this.gridContainer.children.filter(node => {
-            const cp = node.getComponent(TileComponent).gridPos;
+            const comp = node.getComponent(TileComponent);
+            if (!comp) return false; // Пропускаем препятствия
+
+            const cp = comp.gridPos;
             return coords.some(c => c.r === cp.y && c.c === cp.x);
         });
     }
 
     private getNodeAt(r: number, c: number): cc.Node {
         return this.gridContainer.children.find(node => {
-            const cp = node.getComponent(TileComponent).gridPos;
-            return cp.y === r && cp.x === c;
+            const comp = node.getComponent(TileComponent);
+            // Если это не тайл (например, препятствие), пропускаем
+            if (!comp) return false;
+            return comp.gridPos.y === r && comp.gridPos.x === c;
         });
     }
 
     private spawnObstacle(r: number, c: number) {
-        
+        if (!this.obstaclePrefab) return;
+
+        const obstacleNode = cc.instantiate(this.obstaclePrefab);
+        obstacleNode.parent = this.gridContainer;
+
+        const pos = this.getScreenPosition(r, c);
+        obstacleNode.setPosition(cc.v3(pos.x, pos.y, 0));
+    }
+
+    private showScoreAnimation(worldPos: cc.Vec2, amount: number) {
+        if (!this.scorePopupPrefab) return;
+
+        const popup = cc.instantiate(this.scorePopupPrefab);
+        cc.director.getScene().getChildByName('Canvas').addChild(popup);
+
+        const localPos = popup.parent.convertToNodeSpaceAR(worldPos);
+        popup.setPosition(localPos);
+        popup.active = true;
+
+        const label = popup.getComponent(cc.Label) || popup.getComponentInChildren(cc.Label);
+        if (label) label.string = `+${amount}`;
+
+        cc.tween(popup)
+            .parallel(
+                cc.tween().by(0.8, { y: 150 }, { easing: 'sineOut' }),
+                cc.tween().to(0.8, { opacity: 0 })
+            )
+            .removeSelf()
+            .start();
     }
 }

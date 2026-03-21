@@ -1,23 +1,22 @@
-import property = cc._decorator.property;
+﻿import DataService from "./DataService";
 import ccclass = cc._decorator.ccclass;
 import {GameState} from "./GameState";
-import DataService from "./DataService";
+import property = cc._decorator.property;
 
 @ccclass
-export default class GameOverWindow extends cc.Component {
+export default class WinWindow extends cc.Component {
     @property(cc.Label) scoreLabel: cc.Label = null;
     @property(cc.Node) panel: cc.Node = null; // Сама панель окна
 
     onLoad() {
-        // Подписка на состояние проигрыша
         DataService.instance.eventTarget.on('state-changed', (state: GameState) => {
-            if (state === GameState.LOST) this.show();
+            if (state === GameState.WON) {
+                this.show()
+            }
         }, this);
-
-        this.panel.active = false;
     }
 
-    show() {
+    private show() {
         this.panel.active = true;
         this.scoreLabel.string = `Очки: ${DataService.instance.score}`;
 
@@ -27,19 +26,8 @@ export default class GameOverWindow extends cc.Component {
             .start();
     }
 
-    // Привязать в редакторе к кнопке "Заново"
-    public onClickRestart() {
-        DataService.instance.eventTarget.emit(DataService.EVT_RESTART);
-        this.hide();
-    }
-
-    // Привязать в редакторе к кнопке "Продолжить"
-    public onClickContinue() {
-        DataService.instance.eventTarget.emit(DataService.EVT_CONTINUE);
-        this.hide();
-    }
-
-    private hide() {
+    public hide() {
+        DataService.instance.nextLevel();
         cc.tween(this.panel)
             .to(0.2, { scale: 0, opacity: 0 })
             .call(() => {

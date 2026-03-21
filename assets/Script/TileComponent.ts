@@ -43,7 +43,7 @@ export default class TileComponent extends cc.Component {
     public moveTo(r: number, c: number, targetPos: cc.Vec2) {
         this._gridPos = cc.v2(c, r);
         cc.tween(this.node)
-            .to(0.4, { position: cc.v3(targetPos.x, targetPos.y, 0) }, { easing: 'backOut' })
+            .to(0.4, { position: cc.v3(targetPos.x, targetPos.y, 0) }, { easing: 'cubicIn' })
             .start();
     }
 
