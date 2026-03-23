@@ -11,6 +11,7 @@ export default class DataService {
 
     public static readonly EVT_RESTART = 'request-restart';
     public static readonly EVT_CONTINUE = 'request-continue';
+    public static readonly EVT_TELEPORT_USED = 'booster-teleport-used';
 
     // Состояние игры
     private _score: number = 0;
@@ -71,6 +72,10 @@ export default class DataService {
         this.eventTarget.emit('state-changed', this._gameState);
     }
 
+    public nextLevel() {
+        this._currentLevel++;
+    }
+
     private checkWinCondition() {
         if (this._score >= this._targetScore && this._gameState === GameState.PLAYING) {
             this.setGameState(GameState.WON);
@@ -88,9 +93,5 @@ export default class DataService {
         this.eventTarget.emit('moves-changed', this._moves);
         this.eventTarget.emit('shuffle-changed', this._shuffleAttempts);
         this.eventTarget.emit('state-changed', this._gameState);
-    }
-
-    nextLevel() {
-        this._currentLevel++;
     }
 }

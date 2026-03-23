@@ -2,5 +2,6 @@
     PLAYING,
     WON,
     LOST,
-    SHUFFLING
+    SHUFFLING,
+    BOOSTER_TELEPORT,
 }
