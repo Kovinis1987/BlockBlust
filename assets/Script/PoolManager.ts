@@ -14,21 +14,14 @@ export default class PoolManager extends cc.Component {
 
     onLoad() {
         PoolManager._instance = this;
-        // Инициализируем пул
         this._tilePool = new cc.NodePool();
-        console.log("PoolManager onLoad")
-        // Предварительно создаем 50-100 тайлов (зависит от размера сетки),
-        // чтобы не было задержки при первом старте уровня
-        const initialCount = 64;
+        const initialCount = 81;
         for (let i = 0; i < initialCount; i++) {
             let tile = cc.instantiate(this.tilePrefab);
             this._tilePool.put(tile);
         }
     }
 
-    /**
-     * Получить тайл из пула
-     */
     public getTile(): cc.Node {
         let tile = null;
         if (this._tilePool.size() > 0) {
@@ -40,11 +33,7 @@ export default class PoolManager extends cc.Component {
         return tile;
     }
 
-    /**
-     * Вернуть тайл в пул
-     */
     public putTile(tile: cc.Node) {
-        // Важно: перед возвратом в пул останавливаем все текущие анимации на ноде
         tile.stopAllActions();
         this._tilePool.put(tile);
     }

@@ -20,14 +20,18 @@ export default class TileComponent extends cc.Component {
         this.node.on(cc.Node.EventType.TOUCH_END, this.onClick, this);
     }
 
-    init(id: number, r: number, c: number, clickCallback: Function) {
+    public init(id: number, r: number, c: number, clickCallback: Function) {
         this._type = id;
         this._gridPos = cc.v2(c, r);
         this._clickHandler = clickCallback;
 
         const spriteIndex = id - 2;
-        if (this.sprite && this.colors[spriteIndex]) {
+
+        if (this.colors[spriteIndex]) {
             this.sprite.spriteFrame = this.colors[spriteIndex];
+        } else {
+            cc.warn(`Не найден спрайт для ID ${id} (индекс ${spriteIndex})`);
+            // Если индекс не найден, по умолчанию останется синий из префаба
         }
 
         this.node.scale = 1;
@@ -43,7 +47,7 @@ export default class TileComponent extends cc.Component {
     public moveTo(r: number, c: number, targetPos: cc.Vec2) {
         this._gridPos = cc.v2(c, r);
         cc.tween(this.node)
-            .to(0.4, { position: cc.v3(targetPos.x, targetPos.y, 0) }, { easing: 'cubicIn' })
+            .to(0.4, { position: cc.v3(targetPos.x, targetPos.y, 0) }, { easing: 'bounceOut' })
             .start();
     }
 
