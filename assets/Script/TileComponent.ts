@@ -25,14 +25,14 @@ export default class TileComponent extends cc.Component {
         this._gridPos = cc.v2(c, r);
         this._clickHandler = clickCallback;
 
-        const spriteIndex = id - 2;
-
-        if (this.colors[spriteIndex]) {
-            this.sprite.spriteFrame = this.colors[spriteIndex];
-        } else {
-            cc.warn(`Не найден спрайт для ID ${id} (индекс ${spriteIndex})`);
-            // Если индекс не найден, по умолчанию останется синий из префаба
+        // Если это обычный тайл (ID 2-5), меняем цвет
+        if (id >= 2 && id <= 5) {
+            const spriteIndex = id - 2;
+            if (this.colors[spriteIndex]) {
+                this.sprite.spriteFrame = this.colors[spriteIndex];
+            }
         }
+        // Если это бустер (6-9), спрайт уже настроен в префабе, ничего не трогаем
 
         this.node.scale = 1;
         this.node.opacity = 255;
@@ -44,21 +44,29 @@ export default class TileComponent extends cc.Component {
         }
     }
 
-    public moveTo(r: number, c: number, targetPos: cc.Vec2) {
+    public moveTo(r: number, c: number, targetPos: cc.Vec2, onComplete?: Function) {
         this._gridPos = cc.v2(c, r);
+        cc.tween(this.node).stop();
         cc.tween(this.node)
             .to(0.4, { position: cc.v3(targetPos.x, targetPos.y, 0) }, { easing: 'bounceOut' })
+            .call(() => {
+                if (onComplete) onComplete();
+            })
             .start();
     }
 
     public destroyTile(callback: Function) {
+        cc.tween(this.node).stop();
         cc.tween(this.node)
             .to(0.15, { scale: 0, opacity: 0 }, { easing: 'backIn' })
-            .call(() => callback())
+            .call(() => {
+                if (callback) callback();
+            })
             .start();
     }
 
     public shake() {
+        cc.tween(this.node).stop();
         cc.tween(this.node)
             .by(0.05, { x: 5 })
             .by(0.1, { x: -10 })

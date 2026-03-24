@@ -1,11 +1,15 @@
+import GameConfig from "./GameConfig";
+
 export default class GridModel {
     private grid: number[][] = [];
     private rows: number;
     private cols: number;
+    private config: GameConfig;
 
-    constructor(rows: number, cols: number) {
+    constructor(rows: number, cols: number, config: GameConfig) {
         this.rows = rows;
         this.cols = cols;
+        this.config = config; // Сохраняем ссылку
         this.initEmptyGrid();
     }
 
@@ -67,28 +71,30 @@ export default class GridModel {
         });
     }
 
-    /**
-     * Гравитация: тайлы падают только в пустые ячейки (-1),
-     * пролетая мимо препятствий (1).
-     */
     public processFalling(): { from: { r: number, c: number }, to: { r: number, c: number } }[] {
         const movements = [];
-        for (let c = 0; c < this.cols; c++) {
+        let moved = true;
+
+        while (moved) {
+            moved = false;
             for (let r = 0; r < this.rows; r++) {
-                // Если нашли пустую ячейку, ищем ближайший тайл ВЫШЕ неё
-                if (this.grid[r][c] === -1) {
-                    for (let nextR = r + 1; nextR < this.rows; nextR++) {
-                        const tileType = this.grid[nextR][c];
-                        if (tileType === 1) continue; // Пропускаем препятствие
-                        if (tileType !== -1) {
-                            // Нашли тайл, перемещаем его в текущую пустую ячейку r
-                            this.grid[r][c] = tileType;
-                            this.grid[nextR][c] = -1;
-                            movements.push({
-                                from: { r: nextR, c },
-                                to: { r, c }
-                            });
-                            break; // Тайл упал, переходим к следующей ячейке r
+                for (let c = 0; c < this.cols; c++) {
+                    if (this.grid[r][c] === -1) {
+                        // 1. Пробуем взять тайл строго сверху
+                        if (r + 1 < this.rows && this.grid[r + 1][c] > 1) {
+                            this.moveTile(r + 1, c, r, c, movements);
+                            moved = true;
+                        }
+                        // 2. Если сверху препятствие (ID 1), ищем по диагонали
+                        else if (r + 1 < this.rows && this.grid[r + 1][c] === 1) {
+                            for (let step of [-1, 1]) { // Проверка слева и справа
+                                const sideCol = c + step;
+                                if (sideCol >= 0 && sideCol < this.cols && this.grid[r + 1][sideCol] > 1) {
+                                    this.moveTile(r + 1, sideCol, r, c, movements);
+                                    moved = true;
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
@@ -97,9 +103,13 @@ export default class GridModel {
         return movements;
     }
 
-    /**
-     * Заполнение: создаем новые тайлы (ID 2-5) только в пустых ячейках (-1)
-     */
+    private moveTile(fromR: number, fromC: number, toR: number, toC: number, movements: any[]) {
+        const type = this.grid[fromR][fromC];
+        this.grid[toR][toC] = type;
+        this.grid[fromR][fromC] = -1;
+        movements.push({ from: { r: fromR, c: fromC }, to: { r: toR, c: toC } });
+    }
+
     public fillEmptyCells(): { r: number, c: number, type: number }[] {
         const newTiles = [];
         for (let r = 0; r < this.rows; r++) {
@@ -153,6 +163,17 @@ export default class GridModel {
                 }
             }
         }
+    }
+
+    public getBoosterType(group: { r: number, c: number }[]): { type: number, orientation?: 'h' | 'v' } | null {
+        const count = group.length;
+        // Теперь берем данные из нашего Scriptable Object
+        const { rocketMin, bombMin, megaMin } = this.config.economy;
+
+        if (count >= rocketMin && count < bombMin) return { type: 6 };
+        if (count >= bombMin && count < megaMin) return { type: 8 };
+        if (count >= megaMin) return { type: 9 };
+        return null;
     }
 
 }
