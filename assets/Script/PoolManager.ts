@@ -12,12 +12,15 @@ export default class PoolManager extends cc.Component {
     @property([cc.Prefab])
     boosterPrefabs: cc.Prefab[] = [];
 
+    @property([cc.Prefab])
+    effectPrefabs: cc.Prefab[] = [];
+
     private static _instance: PoolManager = null;
+
     private _tilePool: cc.NodePool = null;
     private _scorePopupPool: cc.NodePool = null;
-
-    // Карта пулов для каждого типа бустера
     private _boosterPools: Map<number, cc.NodePool> = new Map();
+    private _effectPools: Map<number, cc.NodePool> = new Map();
 
     public static get instance(): PoolManager {
         return this._instance;
@@ -89,5 +92,24 @@ export default class PoolManager extends cc.Component {
             this._boosterPools.set(type, new cc.NodePool());
         }
         this._boosterPools.get(type).put(node);
+    }
+
+    public getEffect(type: number): cc.Node {
+        if (!this._effectPools.has(type)) {
+            this._effectPools.set(type, new cc.NodePool());
+        }
+        let pool = this._effectPools.get(type);
+        let node = pool.size() > 0 ? pool.get() : cc.instantiate(this.effectPrefabs[type]);
+
+        node.active = true;
+        let ps = node.getComponent(cc.ParticleSystem);
+        if (ps) ps.resetSystem();
+
+        return node;
+    }
+
+    public putEffect(node: cc.Node, type: number) {
+        node.active = false;
+        this._effectPools.get(type).put(node);
     }
 }
