@@ -14,11 +14,9 @@ export default class ScoreUIController extends cc.Component {
 
     onLoad() {
         this.dataService = DataService.instance;
-        // Подписка на события сервиса
         this.dataService.eventTarget.on('score-changed', this.updateScore, this);
         this.dataService.eventTarget.on('moves-changed', this.updateMoves, this);
 
-        // Начальная инициализация
         this.updateScore(this.dataService.score);
         this.updateMoves(this.dataService.moves);
     }
@@ -26,18 +24,18 @@ export default class ScoreUIController extends cc.Component {
     private updateScore(value: number) {
         if (this.scoreLabel) {
             this.scoreLabel.string = `${value} / ${DataService.instance.targetScore}`;
-            this.playBounce(this.scoreLabel.node);
+            ScoreUIController.playBounce(this.scoreLabel.node);
         }
     }
 
     private updateMoves(value: number) {
         if (this.movesLabel) {
             this.movesLabel.string = `${value}`;
-            this.playBounce(this.movesLabel.node);
+            ScoreUIController.playBounce(this.movesLabel.node);
         }
     }
 
-    private playBounce(node: cc.Node) {
+    private static playBounce(node: cc.Node) {
         cc.tween(node)
             .to(0.05, { scale: 1.1 })
             .to(0.1, { scale: 1.0 })

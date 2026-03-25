@@ -27,12 +27,17 @@ export default class WinWindow extends cc.Component {
     }
 
     public hide() {
+        // 1. Увеличиваем индекс в синглтоне
         DataService.instance.nextLevel();
+
         cc.tween(this.panel)
             .to(0.2, { scale: 0, opacity: 0 })
             .call(() => {
                 this.panel.active = false;
                 this.panel.opacity = 255;
+
+                // 2. Генерируем событие загрузки следующего уровня
+                DataService.instance.eventTarget.emit(DataService.EVT_NEXT_LEVEL);
             })
             .start();
     }

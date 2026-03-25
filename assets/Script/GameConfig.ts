@@ -19,6 +19,12 @@ class EconomySettings {
     @property({ tooltip: "Мин. количество тайлов для матча" }) minMatch: number = 3;
 }
 
+@ccclass('AnimationsSettings')
+class AnimationsSettings {
+    @property({ type: cc.Float, tooltip: "Длительность падения" }) fallDuration: number = 0.4;
+    @property({ type: cc.Float, tooltip: "Задержка волны взрыва" }) blastWaveDelay: number = 0.02;
+}
+
 @ccclass
 export default class GameConfig extends cc.Component {
     @property(GridSettings)
@@ -27,10 +33,9 @@ export default class GameConfig extends cc.Component {
     @property(EconomySettings)
     economy: EconomySettings = new EconomySettings();
 
-    @property({ type: cc.Float, tooltip: "Длительность падения" })
-    fallDuration: number = 0.4;
+    @property(AnimationsSettings)
+    animations : AnimationsSettings = new AnimationsSettings();
 
-    @property({ type: cc.Float, tooltip: "Задержка волны взрыва" })
-    blastWaveDelay: number = 0.02;
+
 }
 

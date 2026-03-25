@@ -12,6 +12,7 @@ export default class DataService {
     public static readonly EVT_RESTART = 'request-restart';
     public static readonly EVT_CONTINUE = 'request-continue';
     public static readonly EVT_TELEPORT_USED = 'booster-teleport-used';
+    public static readonly EVT_NEXT_LEVEL = 'request-next-level';
 
     // Состояние игры
     private _score: number = 0;
@@ -42,6 +43,15 @@ export default class DataService {
         this._gameState = GameState.PLAYING;
 
         this.notifyAll();
+    }
+
+    public continueGame(extraMoves: number) {
+        this._moves += extraMoves;
+        this._gameState = GameState.PLAYING;
+
+        // Уведомляем UI об изменениях
+        this.eventTarget.emit('moves-changed', this._moves);
+        this.eventTarget.emit('state-changed', this._gameState);
     }
 
     public addScore(amount: number) {

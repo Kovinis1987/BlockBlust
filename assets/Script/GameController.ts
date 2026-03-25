@@ -36,6 +36,8 @@ export default class GameController extends cc.Component {
 
     private _currentRows: number = 8;
     private _currentCols: number = 8;
+    private _activeExplosionsCount: number = 0;
+
     private data: DataService;
 
     onLoad() {
@@ -89,61 +91,45 @@ export default class GameController extends cc.Component {
     }
 
     private async spawnWithJuice(rows: number, cols: number, tilesData: number[] | null) {
-        if (!this.model) {
-            cc.error("Ошибка: GridModel не инициализирована!");
-            return;
-        }
+        if (!this.model) return;
 
-        this.isProcessing = true; // Блокируем ввод на время анимации
+        this.isProcessing = true;
 
-        // 1. Включаем Layout для автоматической расстановки в сетку
-        const layout = this.gridContainer.getComponent(cc.Layout);
-        if (layout) {
-            layout.enabled = true;
-            // Настраиваем сетку: заполнение сверху вниз (Header), слева направо
-            layout.type = cc.Layout.Type.GRID;
-            layout.startAxis = cc.Layout.AxisDirection.HORIZONTAL;
-            layout.cellSize = cc.size(this.tileSizeX, this.tileSizeY);
-        }
-
-        // 2. Итерируем циклом.
-        // Чтобы Layout заполнил сетку правильно (сверху вниз),
-        // идем от верхнего ряда (rows-1) к нижнему (0)
-        for (let r = rows - 1; r >= 0; r--) {
+        for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-
-                // ИНВЕРСИЯ: В редакторе (0,0) - это левый верх.
-                // В массиве tilesData индекс 0 — это верхний ряд.
-                // Поэтому для r = rows-1 (верх игры) мы берем начало массива.
+                // Вычисляем индекс для данных (сверху вниз)
                 const dataIdx = (rows - 1 - r) * cols + c;
                 const rawValue = tilesData ? tilesData[dataIdx] : 0;
 
-                let finalID: number;
+                let node: cc.Node = null;
+                // Считаем целевую позицию для этой ячейки
+                const targetPos = this.getScreenPosition(r, c);
+
                 if (rawValue === 1) {
-                    finalID = 1; // Препятствие
-                } else if (rawValue === 0) {
-                    finalID = Math.floor(Math.random() * 4) + 2;
-                } else {
-                    finalID = rawValue; // Фиксированный цвет из редактора
-                }
-
-                // Записываем в логическую модель
-                this.model.setTile(r, c, finalID);
-
-                // Создаем визуальную ноду
-                let node: cc.Node;
-                if (finalID === 1) {
+                    this.model.setTile(r, c, 1);
                     node = this.spawnObstacle(r, c);
+                    // Убедись, что внутри spawnObstacle вызывается setPosition(targetPos)
+                } else if (rawValue >= 6 && rawValue <= 9) {
+                    this.model.setTile(r, c, rawValue);
+                    node = PoolManager.instance.getBooster(rawValue);
+                    node.parent = this.gridContainer;
+
+                    // УСТАНАВЛИВАЕМ ПОЗИЦИЮ ВРУЧНУЮ (т.к. Layout нет)
+                    node.setPosition(targetPos.x, targetPos.y);
+
+                    const comp = node.getComponent(TileComponent);
+                    comp.init(rawValue, r, c, (row, col) => this.activateBooster(row, col, rawValue));
                 } else {
-                    node = this.spawnTile(r, c, finalID);
+                    const colorID = rawValue === 0 ? Math.floor(Math.random() * 4) + 2 : rawValue;
+                    this.model.setTile(r, c, colorID);
+                    node = this.spawnTile(r, c, colorID);
+                    // Убедись, что внутри spawnTile вызывается setPosition(targetPos)
                 }
 
-                // 3. Анимация "сочности" (выпрыгивание)
                 if (node) {
                     node.scale = 0;
-                    // Задержка появления зависит от позиции, чтобы была "волна"
-                    const delay = ((rows - 1 - r) * cols + c) * 0.01;
-
+                    // Задержка появления: нижние ряды чуть быстрее верхних
+                    const delay = (r * 0.05) + (c * 0.01);
                     cc.tween(node)
                         .delay(delay)
                         .to(0.3, { scale: 1 }, { easing: 'backOut' })
@@ -152,19 +138,11 @@ export default class GameController extends cc.Component {
             }
         }
 
-        // 4. Финальный аккорд: ждем пока Layout всё расставит и выключаем его
-        const totalDuration = (rows * cols * 0.01) + 0.3;
-
         this.scheduleOnce(() => {
-            if (layout) {
-                layout.updateLayout(); // Принудительно вычисляем позиции прямо сейчас
-                layout.enabled = false; // ВЫКЛЮЧАЕМ, чтобы ноды могли падать вниз (гравитация)
-            }
-
-            this.isProcessing = false; // Разблокируем игру
-            console.log("Уровень успешно загружен и анимирован!");
-        }, totalDuration);
+            this.isProcessing = false;
+        }, 0.5);
     }
+
 
     private spawnTile(r: number, c: number, colorID: number) : cc.Node {
         const tileNode = PoolManager.instance.getTile();
@@ -176,6 +154,24 @@ export default class GameController extends cc.Component {
         const comp = tileNode.getComponent(TileComponent);
         comp.init(colorID, r, c, (row, col) => this.tryBlast(row, col));
         return tileNode;
+    }
+
+    private spawnObstacle(r: number, c: number): cc.Node {
+        const node = cc.instantiate(this.obstaclePrefab);
+        node.parent = this.gridContainer;
+        const pos = this.getScreenPosition(r, c);
+        node.setPosition(pos.x, pos.y);
+        return node;
+    }
+
+    private spawnBooster(r: number, c: number, type: number) {
+        this.model.setTile(r, c, type);
+        const node = PoolManager.instance.getBooster(type); // В пуле сделай метод под разные ID
+        node.parent = this.gridContainer;
+        node.setPosition(this.getScreenPosition(r, c));
+
+        const comp = node.getComponent(TileComponent);
+        comp.init(type, r, c, (row, col) => this.activateBooster(row, col, type));
     }
 
     private getScreenPosition(r: number, c: number): cc.Vec2 {
@@ -216,8 +212,7 @@ export default class GameController extends cc.Component {
         const gridH = this._currentRows * this.tileSizeY;
         const scaleX = maxW / gridW;
         const scaleY = maxH / gridH;
-        let finalScale = Math.min(scaleX, scaleY, 1);
-        this.gridContainer.scale = finalScale;
+        this.gridContainer.scale = Math.min(scaleX, scaleY, 1);
         this.gridContainer.opacity = 0;
         cc.tween(this.gridContainer)
             .to(0.3, { opacity: 255 })
@@ -272,16 +267,6 @@ export default class GameController extends cc.Component {
                 }
             });
         });
-    }
-
-    private spawnBooster(r: number, c: number, type: number) {
-        this.model.setTile(r, c, type);
-        const node = PoolManager.instance.getBooster(type); // В пуле сделай метод под разные ID
-        node.parent = this.gridContainer;
-        node.setPosition(this.getScreenPosition(r, c));
-
-        const comp = node.getComponent(TileComponent);
-        comp.init(type, r, c, (row, col) => this.activateBooster(row, col, type));
     }
 
     private handleContinue() {
@@ -384,14 +369,6 @@ export default class GameController extends cc.Component {
         });
     }
 
-    private spawnObstacle(r: number, c: number): cc.Node {
-        const node = cc.instantiate(this.obstaclePrefab);
-        node.parent = this.gridContainer;
-        const pos = this.getScreenPosition(r, c);
-        node.setPosition(pos.x, pos.y);
-        return node;
-    }
-
     private showScoreAnimation(worldPos: cc.Vec2, amount: number) {
         const popup = PoolManager.instance.getScorePopup();
         if (!popup) return;
@@ -429,7 +406,6 @@ export default class GameController extends cc.Component {
             .start();
     }
 
-
     private activateBooster(r: number, c: number, type: number) {
         if (this.isProcessing) return;
 
@@ -437,12 +413,11 @@ export default class GameController extends cc.Component {
         const neighborBooster = this.findNeighborBooster(r, c);
 
         if (neighborBooster) {
-            this.executeCombo(r, c, type, neighborBooster.r, neighborBooster.c, neighborBooster.type);
+            this.executeCombo(r, c, type, neighborBooster.type);
         } else {
             this.executeSingleBooster(r, c, type);
         }
     }
-
 
     private findNeighborBooster(r: number, c: number): {r: number, c: number, type: number} | null {
         const neighbors = [
@@ -457,7 +432,7 @@ export default class GameController extends cc.Component {
         return null;
     }
 
-    private executeCombo(r1: number, c1: number, type1: number, r2: number, c2: number, type2: number) {
+    private executeCombo(r1: number, c1: number, type1: number, type2: number) {
         this.isProcessing = true;
         let affected: {r: number, c: number}[] = [];
 
@@ -484,7 +459,7 @@ export default class GameController extends cc.Component {
         this.executeExplosion(affected);
     }
 
-    private shakeCamera() {
+    private static shakeCamera() {
         const mainNode = cc.find("Canvas/Main Camera");
         if (!mainNode) return;
 
@@ -495,52 +470,84 @@ export default class GameController extends cc.Component {
             .start();
     }
 
-    private executeExplosion(coords: { r: number, c: number }[], epicenter?: { r: number, c: number }) {
-        this.isProcessing = true;
-        this.shakeCamera();
-
+    private async executeExplosion(coords: { r: number, c: number }[], epicenter?: { r: number, c: number }) {
+        this._activeExplosionsCount++;
+        GameController.shakeCamera();
         if (epicenter) {
             coords.sort((a, b) => {
                 const distA = Math.abs(a.r - epicenter.r) + Math.abs(a.c - epicenter.c);
                 const distB = Math.abs(b.r - epicenter.r) + Math.abs(b.c - epicenter.c);
                 return distA - distB;
             });
+
+            // УДАЛЯЕМ САМ БУСТЕР-ЭПИЦЕНТР СРАЗУ (чтобы он не остался на поле)
+            const epiNode = this.getNodeAt(epicenter.r, epicenter.c);
+            if (epiNode) {
+                const type = epiNode.getComponent(TileComponent).type;
+                this.model.clearCells([epicenter]);
+                PoolManager.instance.putBooster(epiNode, type);
+            }
         }
 
         const nodesToDestroy = this.getNodesByCoords(coords);
-        this.model.clearCells(coords);
+        let processedInThisWave = 0;
 
-        let processed = 0;
+        if (nodesToDestroy.length === 0) {
+            this.finishExplosionWave();
+            return;
+        }
+
         nodesToDestroy.forEach((node, index) => {
-            const delay = index * 0.02;
+            const delay = index * this.config.animations.blastWaveDelay;
 
             this.scheduleOnce(() => {
+                // ПРОВЕРКА 1: Существует ли еще нода? (Защита от циклической ошибки)
+                if (!cc.isValid(node) || !node.parent) {
+                    processedInThisWave++;
+                    if (processedInThisWave === nodesToDestroy.length) this.finishExplosionWave();
+                    return;
+                }
+
                 const comp = node.getComponent(TileComponent);
+                const r = comp.gridPos.y;
+                const c = comp.gridPos.x;
                 const type = comp.type;
-                const worldPos = node.parent.convertToWorldSpaceAR(node.getPosition());
 
-                // Даем очки за каждый тайл (например, 10 за обычный, 50 за бустер)
-                const tilePoints = type >= 6 ? 50 : 10;
-                this.data.addScore(tilePoints);
-                this.showScoreAnimation(worldPos, tilePoints);
+                // ЦЕПНАЯ РЕАКЦИЯ
+                if (type >= 6 && type <= 9) {
+                    // Активируем только если это НЕ тот же самый бустер
+                    if (!epicenter || (r !== epicenter.r || c !== epicenter.c)) {
+                        this.model.clearCells([{r, c}]);
+                        this.activateBooster(r, c, type);
+                    }
+                } else {
+                    // ОБЫЧНЫЙ ТАЙЛ
+                    this.model.clearCells([{r, c}]);
 
-                comp.destroyTile(() => {
-                    if (type >= 6 && type <= 9) {
-                        PoolManager.instance.putBooster(node, type);
-                    } else {
+                    // Безопасное получение координат
+                    const worldPos = node.parent ? node.parent.convertToWorldSpaceAR(node.getPosition()) : cc.v2(0,0);
+                    const points = this.config.economy.scoreTile;
+
+                    this.data.addScore(points);
+                    this.showScoreAnimation(worldPos, points);
+
+                    comp.destroyTile(() => {
                         PoolManager.instance.putTile(node);
-                    }
+                    });
+                }
 
-                    processed++;
-                    if (processed === nodesToDestroy.length) {
-                        this.processGridPhysics();
-                    }
-                });
+                processedInThisWave++;
+                if (processedInThisWave === nodesToDestroy.length) {
+                    this.finishExplosionWave();
+                }
             }, delay);
         });
+    }
 
-        // Если в списке были пустые ячейки (препятствия), которые не ноды
-        if (nodesToDestroy.length === 0) {
+    private finishExplosionWave() {
+        this._activeExplosionsCount--;
+        if (this._activeExplosionsCount <= 0) {
+            this._activeExplosionsCount = 0;
             this.processGridPhysics();
         }
     }

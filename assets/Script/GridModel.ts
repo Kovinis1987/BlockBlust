@@ -64,8 +64,8 @@ export default class GridModel {
 
     public clearCells(group: { r: number, c: number }[]) {
         group.forEach(cell => {
-            // Очищаем только если это не препятствие (на всякий случай)
-            if (this.grid[cell.r][cell.c] !== 1) {
+            // Очищаем ТОЛЬКО если это не стена
+            if (this.grid[cell.r][cell.c] > 1) {
                 this.grid[cell.r][cell.c] = -1;
             }
         });
@@ -79,17 +79,35 @@ export default class GridModel {
             moved = false;
             for (let r = 0; r < this.rows; r++) {
                 for (let c = 0; c < this.cols; c++) {
-                    if (this.grid[r][c] === -1) {
-                        // 1. Пробуем взять тайл строго сверху
-                        if (r + 1 < this.rows && this.grid[r + 1][c] > 1) {
-                            this.moveTile(r + 1, c, r, c, movements);
+                    // ПРАВИЛО 1: Мы работаем ТОЛЬКО с пустыми ячейками (-1)
+                    // Если тут препятствие (1) или тайл (>1), идем дальше
+                    if (this.grid[r][c] !== -1) continue;
+
+                    // ПРАВИЛО 2: Вертикальное падение (приоритет)
+                    let foundVertical = false;
+                    for (let nextR = r + 1; nextR < this.rows; nextR++) {
+                        const tileAbove = this.grid[nextR][c];
+
+                        if (tileAbove === 1) break; // СТЕНА! Выше нее по вертикали ничего не упадет сюда
+
+                        if (tileAbove > 1) { // Нашли кубик или бустер
+                            this.moveTile(nextR, c, r, c, movements);
                             moved = true;
+                            foundVertical = true;
+                            break;
                         }
-                        // 2. Если сверху препятствие (ID 1), ищем по диагонали
-                        else if (r + 1 < this.rows && this.grid[r + 1][c] === 1) {
-                            for (let step of [-1, 1]) { // Проверка слева и справа
-                                const sideCol = c + step;
-                                if (sideCol >= 0 && sideCol < this.cols && this.grid[r + 1][sideCol] > 1) {
+                    }
+
+                    if (foundVertical) continue;
+
+                    // ПРАВИЛО 3: Диагональное обтекание (только если прямо сверху ПРЕПЯТСТВИЕ)
+                    // Если прямо над нами (r+1) стоит 1, пробуем взять из (r+1, c-1) или (r+1, c+1)
+                    if (r + 1 < this.rows && this.grid[r + 1][c] === 1) {
+                        for (let step of [-1, 1]) {
+                            const sideCol = c + step;
+                            if (sideCol >= 0 && sideCol < this.cols) {
+                                const sideTile = this.grid[r + 1][sideCol];
+                                if (sideTile > 1) {
                                     this.moveTile(r + 1, sideCol, r, c, movements);
                                     moved = true;
                                     break;
@@ -104,9 +122,11 @@ export default class GridModel {
     }
 
     private moveTile(fromR: number, fromC: number, toR: number, toC: number, movements: any[]) {
-        const type = this.grid[fromR][fromC];
-        this.grid[toR][toC] = type;
-        this.grid[fromR][fromC] = -1;
+        // ПРАВИЛО 4: Никогда не перемещаем препятствия
+        if (this.grid[fromR][fromC] === 1 || this.grid[toR][toC] === 1) return;
+
+        this.grid[toR][toC] = this.grid[fromR][fromC];
+        this.grid[fromR][fromC] = -1; // Старое место становится пустым
         movements.push({ from: { r: fromR, c: fromC }, to: { r: toR, c: toC } });
     }
 
