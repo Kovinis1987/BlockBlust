@@ -220,8 +220,8 @@
   },
   {
     "__type__": "GridSettings",
-    "paddingLeft": 35,
-    "paddingBottom": 25,
+    "paddingLeft": 50,
+    "paddingBottom": 50,
     "spacingX": 5,
     "spacingY": 5
   },
@@ -726,7 +726,7 @@
       "array": [
         0,
         0,
-        749.1007519584886,
+        760.3703045227372,
         0,
         0,
         0,

@@ -221,7 +221,7 @@ export default class GameController extends cc.Component {
 
     private setupGridSize(rows: number, cols: number) {
         // Удали или выключи компонент Layout в инспекторе навсегда
-        const pLeft = 35, pRight = 35, pTop = 25, pBottom = 25;
+        const pLeft = 55, pRight = 55, pTop = 55, pBottom = 55;
         const spacingX = 4, spacingY = 4;
 
         const totalW = pLeft + pRight + (cols * this.tileSizeX) + ((cols - 1) * spacingX);
