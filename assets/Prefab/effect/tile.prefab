@@ -13,7 +13,7 @@
   },
   {
     "__type__": "cc.Node",
-    "_name": "bomb",
+    "_name": "rocket",
     "_objFlags": 0,
     "_parent": null,
     "_children": [],
@@ -90,26 +90,26 @@
     "_dstBlendFactor": 1,
     "_custom": true,
     "_file": {
-      "__uuid__": "ca692bbf-5b8e-44df-944c-aae6803b8a9b"
+      "__uuid__": "f05be101-6881-46aa-baa9-ef05a1aa110a"
     },
     "_spriteFrame": {
       "__uuid__": "002e18a2-f2d3-4c71-b74b-e9896d7d91cf"
     },
     "_texture": null,
-    "_stopped": true,
+    "_stopped": false,
     "playOnLoad": true,
     "autoRemoveOnFinish": false,
-    "totalParticles": 400,
+    "totalParticles": 371,
     "duration": 0.1,
-    "emissionRate": 2000,
+    "emissionRate": 35.89999999999998,
     "life": 0.2,
-    "lifeVar": 0.1,
+    "lifeVar": 0,
     "_startColor": {
       "__type__": "cc.Color",
       "r": 255,
       "g": 102,
       "b": 51,
-      "a": 226
+      "a": 224
     },
     "_startColorVar": {
       "__type__": "cc.Color",
@@ -132,10 +132,10 @@
       "b": 0,
       "a": 0
     },
-    "angle": 68,
+    "angle": 92,
     "angleVar": 180,
-    "startSize": 163,
-    "startSizeVar": 10,
+    "startSize": 15,
+    "startSizeVar": 150,
     "endSize": -1,
     "endSizeVar": 0,
     "startSpin": 0,
@@ -157,15 +157,15 @@
     "emitterMode": 0,
     "gravity": {
       "__type__": "cc.Vec2",
-      "x": -120,
-      "y": 860
+      "x": 0,
+      "y": 0
     },
-    "speed": 986,
-    "speedVar": 20,
-    "tangentialAccel": -700,
-    "tangentialAccelVar": 0,
-    "radialAccel": 0,
-    "radialAccelVar": 0,
+    "speed": 10,
+    "speedVar": 0,
+    "tangentialAccel": -488.1,
+    "tangentialAccelVar": 172,
+    "radialAccel": -69,
+    "radialAccelVar": 496,
     "rotationIsDir": false,
     "startRadius": 0,
     "startRadiusVar": 0,
@@ -182,9 +182,9 @@
       "__id__": 1
     },
     "asset": {
-      "__uuid__": "69fbe83c-af9c-4cec-906f-68867a86b021"
+      "__uuid__": "f1e8fb75-e691-4cca-a563-26ba1afe017d"
     },
-    "fileId": "75jBBfnZFN+LHuLzYA3I98",
+    "fileId": "59TaJ7t8BHAb+9DiFQ0cKh",
     "sync": false
   }
 ]

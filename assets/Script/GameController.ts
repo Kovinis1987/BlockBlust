@@ -5,6 +5,7 @@ import GameOverWindow from "./GameOverWindow";
 import DataService from "./DataService";
 import {GameState} from "./GameState";
 import GameConfig from "./GameConfig";
+import AudioManager from "./AudioManager";
 
 const { ccclass, property } = cc._decorator;
 
@@ -143,7 +144,6 @@ export default class GameController extends cc.Component {
         }, 0.5);
     }
 
-
     private spawnTile(r: number, c: number, colorID: number) : cc.Node {
         const tileNode = PoolManager.instance.getTile();
         tileNode.parent = this.gridContainer;
@@ -238,6 +238,7 @@ export default class GameController extends cc.Component {
             this.getNodeAt(r, c).getComponent(TileComponent).shake();
             return;
         }
+        AudioManager.instance.play('click');
 
         const boosterData = this.model.getBoosterType(group);
         const points = group.length * 10;
@@ -353,7 +354,7 @@ export default class GameController extends cc.Component {
     private getNodesByCoords(coords: {r:number, c:number}[]): cc.Node[] {
         return this.gridContainer.children.filter(node => {
             const comp = node.getComponent(TileComponent);
-            if (!comp) return false; // Пропускаем препятствия
+            if (!comp) return false;
 
             const cp = comp.gridPos;
             return coords.some(c => c.r === cp.y && c.c === cp.x);
@@ -363,7 +364,6 @@ export default class GameController extends cc.Component {
     private getNodeAt(r: number, c: number): cc.Node {
         return this.gridContainer.children.find(node => {
             const comp = node.getComponent(TileComponent);
-            // Если это не тайл (например, препятствие), пропускаем
             if (!comp) return false;
             return comp.gridPos.y === r && comp.gridPos.x === c;
         });
@@ -373,28 +373,22 @@ export default class GameController extends cc.Component {
         const popup = PoolManager.instance.getScorePopup();
         if (!popup) return;
 
-        // 1. Берем Canvas как родителя, чтобы очки всегда были поверх игрового поля
         const canvas = cc.find("Canvas");
         popup.parent = canvas;
 
-        // 2. СБРОС СОСТОЯНИЯ (Критично для пула)
         popup.stopAllActions();
         popup.opacity = 255;
         popup.scale = 1;
         popup.zIndex = cc.macro.MAX_ZINDEX; // Выводим на самый верхний слой
 
-        // 3. ПРАВИЛЬНЫЙ ПЕРЕСЧЕТ КООРДИНАТ
-        // Переводим мировые координаты тайла в локальные координаты Canvas
         const localPos = canvas.convertToNodeSpaceAR(worldPos);
         popup.setPosition(localPos);
 
-        // 4. ОБНОВЛЕНИЕ ТЕКСТА
         const label = popup.getComponent(cc.Label) || popup.getComponentInChildren(cc.Label);
         if (label) {
             label.string = `+${amount}`;
         }
 
-        // 5. АНИМАЦИЯ
         cc.tween(popup)
             .parallel(
                 cc.tween().by(0.8, { y: 150 }, { easing: 'sineOut' }),
@@ -407,7 +401,7 @@ export default class GameController extends cc.Component {
     }
 
     private activateBooster(r: number, c: number, type: number) {
-        if (this.isProcessing) return;
+        if (this.isProcessing && this._activeExplosionsCount === 0) return;
 
         // Ищем соседа-бустера для комбо (в радиусе 1 клетки)
         const neighborBooster = this.findNeighborBooster(r, c);
@@ -419,7 +413,36 @@ export default class GameController extends cc.Component {
         }
     }
 
-    private findNeighborBooster(r: number, c: number): {r: number, c: number, type: number} | null {
+    private spawnExplosionFXByPos(pos: cc.Vec2, fxType: number) {
+        const fx = PoolManager.instance.getEffect(fxType);
+        if (!fx) return;
+        console.log("spawnExplosionFXByPos", fxType)
+
+        // 1. Сначала выключаем, если вдруг была активна
+        fx.active = false;
+
+        fx.parent = this.gridContainer;
+        fx.zIndex = cc.macro.MAX_ZINDEX;
+
+        // 2. Поворачиваем и позиционируем ПЕРЕД активацией
+        fx.setPosition(pos.x, pos.y);
+
+        // 3. Теперь включаем ноду
+        fx.active = true;
+
+        const ps = fx.getComponent(cc.ParticleSystem);
+        if (ps) {
+            // 4. Форсированный перезапуск
+            ps.stopSystem();
+            ps.resetSystem();
+        }
+
+        this.scheduleOnce(() => {
+            if (cc.isValid(fx) && fx.parent) {
+                PoolManager.instance.putEffect(fx, fxType);
+            }
+        }, 1.2);
+    }    private findNeighborBooster(r: number, c: number): {r: number, c: number, type: number} | null {
         const neighbors = [
             {r: r+1, c}, {r: r-1, c}, {r, c: c+1}, {r, c: c-1}
         ];
@@ -435,113 +458,170 @@ export default class GameController extends cc.Component {
     private executeCombo(r1: number, c1: number, type1: number, type2: number) {
         this.isProcessing = true;
         let affected: {r: number, c: number}[] = [];
+        const epicenter = { r: r1, c: c1 };
 
-        // Логика комбинаций (примеры)
-        if ((type1 === 6 || type1 === 7) && (type2 === 6 || type2 === 7)) {
-            // РАКЕТА + РАКЕТА = Крест на всё поле
-            for (let i = 0; i < this._currentCols; i++) affected.push({r: r1, c: i});
-            for (let i = 0; i < this._currentRows; i++) affected.push({r: i, c: c1});
-        }
-        else if ((type1 === 8 && (type2 === 6 || type2 === 7)) || (type2 === 8 && (type1 === 6 || type1 === 7))) {
-            // БОМБА + РАКЕТА = 3 линии сразу (горизонталь и вертикаль)
-            for (let i = -1; i <= 1; i++) {
-                for (let j = 0; j < this._currentCols; j++) if (r1+i >= 0 && r1+i < this._currentRows) affected.push({r: r1+i, c: j});
-                for (let j = 0; j < this._currentRows; j++) if (c1+i >= 0 && c1+i < this._currentCols) affected.push({r: j, c: c1+i});
-            }
+        // КОМБО: РАКЕТА + РАКЕТА или РАКЕТА + БОМБА
+        const isRocket1 = type1 === 6 || type1 === 7;
+        const isRocket2 = type2 === 6 || type2 === 7;
+        const isBomb = type1 === 8 || type2 === 8;
+
+        if ((isRocket1 && isRocket2) || (isRocket1 && isBomb) || (isRocket2 && isBomb)) {
+            // 1. Логика: Зачищаем весь ряд и весь столбец (Крест)
+            for (let i = 0; i < this._currentCols; i++) affected.push({ r: r1, c: i });
+            for (let i = 0; i < this._currentRows; i++) affected.push({ r: i, c: c1 });
+
+            // 2. Визуал: Бахаем "Мега-Крест" частицами в точке клика
+            const pos = this.getScreenPosition(r1, c1);
+            this.spawnCrossFX(pos);
+
+            // Если это Бомба + Ракета, можно добавить еще и взрыв бомбы для жирности
+            if (isBomb) this.spawnExplosionFXByPos(pos, 3);
         }
         else if (type1 === 9 || type2 === 9) {
-            // ЛЮБОЙ + МЕГА-БОМБА = Полная зачистка
+            // МЕГА-БОМБА комбо: тотальная зачистка
             for (let i = 0; i < this._currentRows; i++) {
-                for (let j = 0; j < this._currentCols; j++) affected.push({r: i, c: j});
+                for (let j = 0; j < this._currentCols; j++) affected.push({ r: i, c: j });
             }
+            this.spawnExplosionFXByPos(this.getScreenPosition(r1, c1), 3); // Большой бабах
         }
 
-        this.executeExplosion(affected);
-    }
-
-    private static shakeCamera() {
-        const mainNode = cc.find("Canvas/Main Camera");
-        if (!mainNode) return;
-
-        cc.tween(mainNode)
-            .by(0.05, { x: 10, y: 10 })
-            .by(0.05, { x: -20, y: -10 })
-            .by(0.05, { x: 10, y: 0 })
-            .start();
+        this.executeExplosion(affected, epicenter);
     }
 
     private async executeExplosion(coords: { r: number, c: number }[], epicenter?: { r: number, c: number }) {
         this._activeExplosionsCount++;
         GameController.shakeCamera();
-        if (epicenter) {
-            coords.sort((a, b) => {
-                const distA = Math.abs(a.r - epicenter.r) + Math.abs(a.c - epicenter.c);
-                const distB = Math.abs(b.r - epicenter.r) + Math.abs(b.c - epicenter.c);
-                return distA - distB;
-            });
 
-            // УДАЛЯЕМ САМ БУСТЕР-ЭПИЦЕНТР СРАЗУ (чтобы он не остался на поле)
-            const epiNode = this.getNodeAt(epicenter.r, epicenter.c);
-            if (epiNode) {
-                const type = epiNode.getComponent(TileComponent).type;
-                this.model.clearCells([epicenter]);
-                PoolManager.instance.putBooster(epiNode, type);
-            }
+        // 1. Подготовка: сортировка и удаление самого бустера, на который кликнули
+        if (epicenter) {
+            this.sortCoordsByEpicenter(coords, epicenter);
+            this.removeEpicenterNode(epicenter);
         }
 
         const nodesToDestroy = this.getNodesByCoords(coords);
-        let processedInThisWave = 0;
-
         if (nodesToDestroy.length === 0) {
             this.finishExplosionWave();
             return;
         }
 
+        // 2. Запуск волны взрывов через итератор
         nodesToDestroy.forEach((node, index) => {
             const delay = index * this.config.animations.blastWaveDelay;
-
             this.scheduleOnce(() => {
-                // ПРОВЕРКА 1: Существует ли еще нода? (Защита от циклической ошибки)
-                if (!cc.isValid(node) || !node.parent) {
-                    processedInThisWave++;
-                    if (processedInThisWave === nodesToDestroy.length) this.finishExplosionWave();
-                    return;
-                }
+                this.processSingleNodeExplosion(node, epicenter);
 
-                const comp = node.getComponent(TileComponent);
-                const r = comp.gridPos.y;
-                const c = comp.gridPos.x;
-                const type = comp.type;
-
-                // ЦЕПНАЯ РЕАКЦИЯ
-                if (type >= 6 && type <= 9) {
-                    // Активируем только если это НЕ тот же самый бустер
-                    if (!epicenter || (r !== epicenter.r || c !== epicenter.c)) {
-                        this.model.clearCells([{r, c}]);
-                        this.activateBooster(r, c, type);
-                    }
-                } else {
-                    // ОБЫЧНЫЙ ТАЙЛ
-                    this.model.clearCells([{r, c}]);
-
-                    // Безопасное получение координат
-                    const worldPos = node.parent ? node.parent.convertToWorldSpaceAR(node.getPosition()) : cc.v2(0,0);
-                    const points = this.config.economy.scoreTile;
-
-                    this.data.addScore(points);
-                    this.showScoreAnimation(worldPos, points);
-
-                    comp.destroyTile(() => {
-                        PoolManager.instance.putTile(node);
-                    });
-                }
-
-                processedInThisWave++;
-                if (processedInThisWave === nodesToDestroy.length) {
+                // Если это последняя нода в текущем списке — закрываем волну
+                if (index === nodesToDestroy.length - 1) {
                     this.finishExplosionWave();
                 }
             }, delay);
         });
+    }
+
+    private sortCoordsByEpicenter(coords: { r: number, c: number }[], epi: { r: number, c: number }) {
+        coords.sort((a, b) => {
+            const distA = Math.abs(a.r - epi.r) + Math.abs(a.c - epi.c);
+            const distB = Math.abs(b.r - epi.r) + Math.abs(b.c - epi.c);
+            return distA - distB;
+        });
+    }
+
+    private removeEpicenterNode(epi: { r: number, c: number }) {
+        const epiNode = this.getNodeAt(epi.r, epi.c);
+        if (!epiNode) return;
+
+        const type = epiNode.getComponent(TileComponent).type;
+        const pos = this.getScreenPosition(epi.r, epi.c);
+
+        // Сначала звук и искры в правильном месте
+        this.playExplosionEffects(pos, type);
+
+        this.model.clearCells([epi]);
+        PoolManager.instance.putBooster(epiNode, type);
+    }
+
+    private processSingleNodeExplosion(node: cc.Node, epicenter?: { r: number, c: number }) {
+        if (!cc.isValid(node)) return;
+
+        const comp = node.getComponent(TileComponent);
+        const { y: r, x: c } = comp.gridPos;
+        const type = comp.type;
+
+        // Считаем позицию по индексам сетки (это никогда не подведет)
+        const pos = this.getScreenPosition(r, c);
+
+        // 1. Визуальные и звуковые эффекты (теперь по позиции)
+        this.playExplosionEffects(pos, type);
+
+        // 2. Логика уничтожения
+        if (type >= 6 && type <= 9) {
+            this.handleBoosterChainReaction(r, c, type, epicenter, node);
+        } else {
+            this.handleRegularTileDestruction(node, type, r, c);
+        }
+    }
+
+    private playExplosionEffects(pos: cc.Vec2, tileType: number) {
+        switch (tileType) {
+            case 0:
+                this.spawnExplosionFXByPos(pos, 0);
+                break;
+            case 6:
+                this.spawnExplosionFXByPos(pos, 1);
+                AudioManager.instance.play('booster');
+                break;
+            case 7:
+                this.spawnExplosionFXByPos(pos, 2);
+                AudioManager.instance.play('booster');
+                break;
+            case 8:
+            case 9:
+                this.spawnExplosionFXByPos(pos, 3);
+                AudioManager.instance.playBlastSpam();
+                break;
+            default:
+                this.spawnExplosionFXByPos(pos, 0);
+        }
+    }
+
+    private handleRegularTileDestruction(node: cc.Node, type: number, r: number, c: number) {
+        if (!cc.isValid(node) || !node.parent) return; // ЗАЩИТА: если нода уже в пуле, ничего не делаем
+
+        this.model.clearCells([{ r, c }]);
+
+        // 1. Считаем позицию (берем ЛОКАЛЬНУЮ из модели, чтобы не зависеть от parent)
+        const localPos = this.getScreenPosition(r, c);
+
+        // 2. Для анимации очков нам нужны мировые координаты.
+        // Берем их у контейнера, так как он точно никуда не денется.
+        const worldPos = this.gridContainer.convertToWorldSpaceAR(localPos);
+
+        const points = this.config.economy.scoreTile;
+        this.data.addScore(points);
+        this.showScoreAnimation(worldPos, points);
+
+        // 3. Анимация исчезновения
+        node.getComponent(TileComponent).destroyTile(() => {
+            PoolManager.instance.putTile(node);
+        });
+    }
+
+    private handleBoosterChainReaction(r: number, c: number, type: number, epicenter: { r: number, c: number }, node: cc.Node) {
+        // Проверка, чтобы не активировать тот же бустер, который запустил волну
+        const isNotEpicenter = !epicenter || (r !== epicenter.r || c !== epicenter.c);
+
+        if (isNotEpicenter) {
+            this.model.clearCells([{ r, c }]);
+            this.activateBooster(r, c, type);
+            // Бустеры-жертвы убираем мгновенно для стабильности
+            PoolManager.instance.putBooster(node, type);
+        }
+    }
+
+    private spawnCrossFX(pos: cc.Vec2) {
+        this.spawnExplosionFXByPos(pos, 1);
+        this.spawnExplosionFXByPos(pos, 2);
+        console.log("spawnCrossFX")
     }
 
     private finishExplosionWave() {
@@ -579,5 +659,16 @@ export default class GameController extends cc.Component {
         }
 
         this.executeExplosion(affected, { r, c });
+    }
+
+    private static shakeCamera() {
+        const mainNode = cc.find("Canvas/Main Camera");
+        if (!mainNode) return;
+
+        cc.tween(mainNode)
+            .by(0.05, { x: 10, y: 10 })
+            .by(0.05, { x: -20, y: -10 })
+            .by(0.05, { x: 10, y: 0 })
+            .start();
     }
 }

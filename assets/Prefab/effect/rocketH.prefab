@@ -48,8 +48,8 @@
       "__type__": "TypedArray",
       "ctor": "Float64Array",
       "array": [
-        -55.435,
-        192.982,
+        0,
+        0,
         0,
         0,
         0,
@@ -96,11 +96,11 @@
       "__uuid__": "002e18a2-f2d3-4c71-b74b-e9896d7d91cf"
     },
     "_texture": null,
-    "_stopped": true,
+    "_stopped": false,
     "playOnLoad": true,
     "autoRemoveOnFinish": false,
     "totalParticles": 371,
-    "duration": 0.05,
+    "duration": 0.1,
     "emissionRate": 1855,
     "life": 0.2,
     "lifeVar": 0,
@@ -152,8 +152,8 @@
       "x": 0,
       "y": 619
     },
-    "_positionType": 1,
-    "positionType": 1,
+    "_positionType": 2,
+    "positionType": 2,
     "emitterMode": 0,
     "gravity": {
       "__type__": "cc.Vec2",

@@ -98,18 +98,36 @@ export default class PoolManager extends cc.Component {
         if (!this._effectPools.has(type)) {
             this._effectPools.set(type, new cc.NodePool());
         }
+
         let pool = this._effectPools.get(type);
         let node = pool.size() > 0 ? pool.get() : cc.instantiate(this.effectPrefabs[type]);
 
-        node.active = true;
-        let ps = node.getComponent(cc.ParticleSystem);
-        if (ps) ps.resetSystem();
-
-        return node;
+        if (node) {
+            node.active = true;
+            let ps = node.getComponent(cc.ParticleSystem);
+            if (ps) {
+                ps.stopSystem();   // Остановка старого цикла (если был)
+                ps.resetSystem();  // Полный сброс и запуск нового
+            }
+            return node;
+        }
+        return null;
     }
 
     public putEffect(node: cc.Node, type: number) {
+        if (!node || !cc.isValid(node)) return;
+
+        const ps = node.getComponent(cc.ParticleSystem);
+        if (ps) {
+            ps.stopSystem(); // Останавливаем эмиссию
+        }
+
         node.active = false;
+        node.removeFromParent(false);
+
+        if (!this._effectPools.has(type)) {
+            this._effectPools.set(type, new cc.NodePool());
+        }
         this._effectPools.get(type).put(node);
     }
 }

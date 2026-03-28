@@ -17,8 +17,16 @@ export default class AudioManager extends cc.Component {
 
     onLoad() {
         AudioManager._instance = this;
-        cc.game.addPersistRootNode(this.node); // Делаем его неубиваемым между сценами
-        this.playBGM();
+        cc.game.addPersistRootNode(this.node);
+
+        // Лог для проверки в консоли браузера (F12)
+        console.log("BGM Clip:", this.bgm);
+        console.log("Blast SFX Clip:", this.blastSfx);
+
+        // Попробуем запустить музыку чуть позже, когда движок точно готов
+        this.scheduleOnce(() => {
+            this.playBGM();
+        }, 0.1);
     }
 
     public playBlastSpam() {
