@@ -64,8 +64,7 @@ export default class GridModel {
 
     public clearCells(group: { r: number, c: number }[]) {
         group.forEach(cell => {
-            // Очищаем ТОЛЬКО если это не стена
-            if (this.grid[cell.r][cell.c] > 1) {
+            if (this.grid[cell.r][cell.c] > 1) { 
                 this.grid[cell.r][cell.c] = -1;
             }
         });
@@ -79,18 +78,15 @@ export default class GridModel {
             moved = false;
             for (let r = 0; r < this.rows; r++) {
                 for (let c = 0; c < this.cols; c++) {
-                    // ПРАВИЛО 1: Мы работаем ТОЛЬКО с пустыми ячейками (-1)
-                    // Если тут препятствие (1) или тайл (>1), идем дальше
                     if (this.grid[r][c] !== -1) continue;
 
-                    // ПРАВИЛО 2: Вертикальное падение (приоритет)
                     let foundVertical = false;
                     for (let nextR = r + 1; nextR < this.rows; nextR++) {
                         const tileAbove = this.grid[nextR][c];
 
-                        if (tileAbove === 1) break; // СТЕНА! Выше нее по вертикали ничего не упадет сюда
+                        if (tileAbove === 1) break; 
 
-                        if (tileAbove > 1) { // Нашли кубик или бустер
+                        if (tileAbove > 1) { 
                             this.moveTile(nextR, c, r, c, movements);
                             moved = true;
                             foundVertical = true;
@@ -130,15 +126,14 @@ export default class GridModel {
         movements.push({ from: { r: fromR, c: fromC }, to: { r: toR, c: toC } });
     }
 
-    public fillEmptyCells(): { r: number, c: number, type: number }[] {
-        const newTiles = [];
-        for (let r = 0; r < this.rows; r++) {
-            for (let c = 0; c < this.cols; c++) {
+    public fillEmptyCells(): { r: number; c: number; type: number }[] {
+        const newTiles: { r: number; c: number; type: number }[] = [];
+        for (let c = 0; c < this.cols; c++) {
+            for (let r = this.rows - 1; r >= 0; r--) {
                 if (this.grid[r][c] === -1) {
-                    // Генерируем ID от 2 до 5 (ваши 4 цвета)
-                    const randomType = Math.floor(Math.random() * 4) + 2;
-                    this.grid[r][c] = randomType;
-                    newTiles.push({ r, c, type: randomType });
+                    const colorID = Math.floor(Math.random() * 4) + 2; // 2-5
+                    this.grid[r][c] = colorID;
+                    newTiles.push({ r, c, type: colorID });
                 }
             }
         }
@@ -187,13 +182,42 @@ export default class GridModel {
 
     public getBoosterType(group: { r: number, c: number }[]): { type: number, orientation?: 'h' | 'v' } | null {
         const count = group.length;
-        // Теперь берем данные из нашего Scriptable Object
         const { rocketMin, bombMin, megaMin } = this.config.economy;
 
-        if (count >= rocketMin && count < bombMin) return { type: 6 };
-        if (count >= bombMin && count < megaMin) return { type: 8 };
-        if (count >= megaMin) return { type: 9 };
-        return null;
-    }
+        if (count < rocketMin) return null;
 
+        // Определяем bounding box группы
+        let minR = group[0].r, maxR = group[0].r;
+        let minC = group[0].c, maxC = group[0].c;
+
+        for (const cell of group) {
+            minR = Math.min(minR, cell.r);
+            maxR = Math.max(maxR, cell.r);
+            minC = Math.min(minC, cell.c);
+            maxC = Math.max(maxC, cell.c);
+        }
+
+        const height = maxR - minR + 1; // строки
+        const width = maxC - minC + 1;  // столбцы
+
+        let type: number;
+        let orientation: 'h' | 'v' | undefined;
+
+        if (count >= megaMin) {
+            type = 9; // мега (всё поле)
+        } else if (count >= bombMin) {
+            type = 8; // бомба (5x5)
+        } else if (count >= rocketMin) {
+            // Ракета: выбираем ориентацию по форме
+            if (height > width) {
+                type = 7; // вертикальная ракета
+                orientation = 'v';
+            } else {
+                type = 6; // горизонтальная ракета
+                orientation = 'h';
+            }
+        }
+
+        return { type, orientation };
+    }
 }

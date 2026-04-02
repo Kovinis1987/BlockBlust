@@ -283,6 +283,7 @@ export default class GameController extends cc.Component {
         const movements = this.model.processFalling();
         let activeAnimations = 0;
 
+        // 1. Анимация падения существующих тайлов
         movements.forEach(move => {
             const node = this.getNodeAt(move.from.r, move.from.c);
             if (node) {
@@ -290,7 +291,6 @@ export default class GameController extends cc.Component {
                 const finalPos = this.getScreenPosition(move.to.r, move.to.c);
                 const comp = node.getComponent(TileComponent);
                 comp.gridPos.y = move.to.r;
-                comp.gridPos.x = move.to.c;
                 comp.moveTo(move.to.r, move.to.c, finalPos, () => {
                     activeAnimations--;
                     if (activeAnimations <= 0) this.finalizePhysics();
@@ -298,28 +298,35 @@ export default class GameController extends cc.Component {
             }
         });
 
+        // 2. Создание новых тайлов СВЕРХУ для полностью пустых колонок
         const news = this.model.fillEmptyCells();
         news.forEach(n => {
             activeAnimations++;
             const tileNode = PoolManager.instance.getTile();
             tileNode.parent = this.gridContainer;
 
+            // Начальная позиция — выше сетки
+            const startY = (this._currentRows * this.tileSizeY) / 2 + 200;
             const finalPos = this.getScreenPosition(n.r, n.c);
-            tileNode.setPosition(finalPos.x, (this._currentRows * this.tileSizeY) / 2 + 200);
+
+            tileNode.setPosition(finalPos.x, startY); // начинается сверху
 
             const comp = tileNode.getComponent(TileComponent);
             comp.init(n.type, n.r, n.c, (row, col) => this.tryBlast(row, col));
+
+            // Анимация падения с easing
             comp.moveTo(n.r, n.c, finalPos, () => {
                 activeAnimations--;
                 if (activeAnimations <= 0) this.finalizePhysics();
             });
         });
 
+        // Если нет никаких анимаций — сразу завершаем
         if (movements.length === 0 && news.length === 0) {
             this.finalizePhysics();
         }
     }
-
+    
     private finalizePhysics() {
         this.isProcessing = false;
         this.checkPossibleMoves();
@@ -372,22 +379,57 @@ export default class GameController extends cc.Component {
         let affected: {r: number, c: number}[] = [];
         const epicenter = { r: r1, c: c1 };
 
+        const neighbor = this.findNeighborBooster(r1, c1);
+        if (!neighbor) {
+            this.finishExplosionWave();
+            return;
+        }
+
+        const r2 = neighbor.r;
+        const c2 = neighbor.c;
+
         const isRocket1 = type1 === 6 || type1 === 7;
         const isRocket2 = type2 === 6 || type2 === 7;
         const isBomb = type1 === 8 || type2 === 8;
 
         const pos = this.getScreenPosition(r1, c1);
 
+        affected.push(epicenter);
+
+        affected.push({ r: r2, c: r2 });
+
         if ((isRocket1 && isRocket2) || (isRocket1 && isBomb) || (isRocket2 && isBomb)) {
-            EffectManager.instance.spawnCrossFX(this.gridContainer, pos); //
+            EffectManager.instance.spawnCrossFX(this.gridContainer, pos);
             if (isBomb) EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 3);
-        } else if (type1 === 9 || type2 === 9) {
+
+            for (let i = 0; i < this._currentCols; i++) affected.push({ r: r1, c: i });
+            for (let i = 0; i < this._currentRows; i++) affected.push({ r: i, c: c1 });
+            affected = this.removeDuplicates(affected);
+        }
+        else if (type1 === 8 || type2 === 8 || type1 === 9 || type2 === 9) {
             EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 3);
+            for (let i = r1 - 2; i <= r1 + 2; i++) {
+                for (let j = c1 - 2; j <= c1 + 2; j++) {
+                    if (i >= 0 && i < this._currentRows && j >= 0 && j < this._currentCols) {
+                        affected.push({ r: i, c: j });
+                    }
+                }
+            }
+            affected = this.removeDuplicates(affected);
         }
 
         this.executeExplosion(affected, epicenter);
     }
 
+    private removeDuplicates(coords: { r: number; c: number }[]): { r: number; c: number }[] {
+        const seen = new Set<string>();
+        return coords.filter(coord => {
+            const key = `${coord.r},${coord.c}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }
     private async executeExplosion(coords: { r: number, c: number }[], epicenter?: { r: number, c: number }) {
         this._activeExplosionsCount++;
         EffectManager.instance.shakeCamera();
