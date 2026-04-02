@@ -8,7 +8,6 @@ export default class PoolManager extends cc.Component {
     @property(cc.Prefab)
     scorePopupPrefab: cc.Prefab = null;
 
-    // МАССИВ префабов: 0-РакетаH, 1-РакетаV, 2-Бомба, 3-Мега
     @property([cc.Prefab])
     boosterPrefabs: cc.Prefab[] = [];
 
@@ -59,7 +58,6 @@ export default class PoolManager extends cc.Component {
     }
 
     public getBooster(type: number): cc.Node {
-        // Создаем пул для этого типа, если его еще нет
         if (!this._boosterPools.has(type)) {
             this._boosterPools.set(type, new cc.NodePool());
         }
@@ -70,7 +68,6 @@ export default class PoolManager extends cc.Component {
         if (pool.size() > 0) {
             node = pool.get();
         } else {
-            // Индекс: тип 6 -> индекс 0, тип 7 -> индекс 1 и т.д.
             const prefab = this.boosterPrefabs[type - 6];
             if (prefab) {
                 node = cc.instantiate(prefab);
@@ -106,8 +103,8 @@ export default class PoolManager extends cc.Component {
             node.active = true;
             let ps = node.getComponent(cc.ParticleSystem);
             if (ps) {
-                ps.stopSystem();   // Остановка старого цикла (если был)
-                ps.resetSystem();  // Полный сброс и запуск нового
+                ps.stopSystem();
+                ps.resetSystem();
             }
             return node;
         }
@@ -119,7 +116,7 @@ export default class PoolManager extends cc.Component {
 
         const ps = node.getComponent(cc.ParticleSystem);
         if (ps) {
-            ps.stopSystem(); // Останавливаем эмиссию
+            ps.stopSystem();
         }
 
         node.active = false;

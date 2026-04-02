@@ -19,18 +19,13 @@ export default class AudioManager extends cc.Component {
         AudioManager._instance = this;
         cc.game.addPersistRootNode(this.node);
 
-        // Лог для проверки в консоли браузера (F12)
-        console.log("BGM Clip:", this.bgm);
-        console.log("Blast SFX Clip:", this.blastSfx);
-
-        // Попробуем запустить музыку чуть позже, когда движок точно готов
         this.scheduleOnce(() => {
             this.playBGM();
         }, 0.1);
     }
 
     public playBlastSpam() {
-        if (!this.blastSfx) return; // Защита
+        if (!this.blastSfx) return;
         let now = Date.now();
         if (now - this._lastBlastTime > 50) {
             this.play('blast');
@@ -47,7 +42,6 @@ export default class AudioManager extends cc.Component {
         cc.audioEngine.playEffect(clip, false);
     }
 
-    // Сеньорская фишка: проигрывание по имени (строке), чтобы не таскать ссылки везде
     public play(effectName: string) {
         switch(effectName) {
             case 'blast': this.playSFX(this.blastSfx); break;
