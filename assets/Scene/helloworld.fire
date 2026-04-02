@@ -85,6 +85,9 @@
       },
       {
         "__id__": 12
+      },
+      {
+        "__id__": 132
       }
     ],
     "_prefab": null,
@@ -397,9 +400,6 @@
       "__id__": 13
     },
     "currentLevel": 0,
-    "gameOverWindow": {
-      "__id__": 126
-    },
     "scorePopupPrefab": {
       "__uuid__": "ceb79d17-da3a-4eab-81b6-cc737f434e55"
     },
@@ -726,7 +726,7 @@
       "array": [
         0,
         0,
-        578.504969728005,
+        832.2504130368455,
         0,
         0,
         0,
@@ -5634,5 +5634,15 @@
     "_isTrimmedMode": true,
     "_atlas": null,
     "_id": "f4YtAl+8VDDa++spp1UYyA"
+  },
+  {
+    "__type__": "9690dqi2EtLkYTGSslAzZHc",
+    "_name": "",
+    "_objFlags": 0,
+    "node": {
+      "__id__": 2
+    },
+    "_enabled": true,
+    "_id": "d9fsh/TuNJHKNvCSvfflRq"
   }
 ]

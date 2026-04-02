@@ -1,7 +1,7 @@
 import property = cc._decorator.property;
 import ccclass = cc._decorator.ccclass;
-import {GameState} from "./Enum/GameState";
-import DataService from "./DataService";
+import DataService from "../DataService";
+import {GameState} from "../Enum/GameState";
 
 @ccclass
 export default class GameOverWindow extends cc.Component {
@@ -9,7 +9,6 @@ export default class GameOverWindow extends cc.Component {
     @property(cc.Node) panel: cc.Node = null; // Сама панель окна
 
     onLoad() {
-        // Подписка на состояние проигрыша
         DataService.instance.eventTarget.on('state-changed', (state: GameState) => {
             if (state === GameState.LOST) this.show();
         }, this);
@@ -27,13 +26,11 @@ export default class GameOverWindow extends cc.Component {
             .start();
     }
 
-    // Привязать в редакторе к кнопке "Заново"
     public onClickRestart() {
         DataService.instance.eventTarget.emit(DataService.EVT_RESTART);
         this.hide();
     }
 
-    // Привязать в редакторе к кнопке "Продолжить"
     public onClickContinue() {
         DataService.instance.eventTarget.emit(DataService.EVT_CONTINUE);
         this.hide();

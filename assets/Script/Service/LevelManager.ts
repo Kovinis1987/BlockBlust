@@ -1,5 +1,4 @@
-﻿import GameConfig from "../Config/GameConfig";
-import {LevelData} from "../Interface/LevelData";
+﻿import {LevelData} from "../Interface/LevelData";
 
 export default class LevelManager {
     private static _instance: LevelManager;
@@ -8,24 +7,18 @@ export default class LevelManager {
         return this._instance;
     }
 
-    private config: GameConfig;
-
-    init(config: GameConfig) {
-        this.config = config;
-    }
-
     loadLevel(levelIndex: number, onComplete?: (data: LevelData) => void) {
-        console.log("📁 LevelManager: загрузка уровня", levelIndex);
+        console.log("LevelManager: загрузка уровня", levelIndex);
 
         cc.resources.load('configs/levels', cc.JsonAsset, (err, res: cc.JsonAsset) => {
             if (err) {
-                console.error("❌ Ошибка загрузки levels.json:", err);
+                console.error("Ошибка загрузки levels.json:", err);
                 return;
             }
 
             let data;
             if (!res.json || !res.json[levelIndex]) {
-                cc.warn("⚠️ Уровень не найден. Используем дефолт...");
+                cc.warn("Уровень не найден. Используем дефолт...");
                 data = {
                     rows: 9,
                     cols: 9,

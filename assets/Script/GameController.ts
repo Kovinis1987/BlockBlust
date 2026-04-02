@@ -1,12 +1,12 @@
-import GridModel from "./GridModel";
-import TileComponent from "./TileComponent";
 import PoolManager from "./PoolManager";
-import GameOverWindow from "./GameOverWindow";
 import DataService from "./DataService";
 import AudioManager from "./AudioManager";
 import GameConfig from "./Config/GameConfig";
 import {GameState} from "./Enum/GameState";
 import LevelManager from "./Service/LevelManager";
+import EffectManager from "./Service/EffectManager";
+import TileComponent from "./Component/TileComponent";
+import GridModel from "./Component/GridModel";
 
 const { ccclass, property } = cc._decorator;
 
@@ -17,9 +17,6 @@ export default class GameController extends cc.Component {
 
     @property(cc.Integer)
     currentLevel: number = 0;
-
-    @property(GameOverWindow)
-    gameOverWindow: GameOverWindow = null;
 
     @property(cc.Prefab)
     scorePopupPrefab: cc.Prefab = null;
@@ -44,16 +41,11 @@ export default class GameController extends cc.Component {
     onLoad() {
         this.data = DataService.instance;
 
-        // Инициализируем LevelManager
-        LevelManager.instance.init(this.config);
-
-        // Подписываемся на события
         this.node.on(cc.Node.EventType.TOUCH_END, this.handleTouch, this);
         this.data.eventTarget.on(DataService.EVT_RESTART, this.restartLevel, this);
         this.data.eventTarget.on(DataService.EVT_CONTINUE, this.handleContinue, this);
         this.data.eventTarget.on(DataService.EVT_NEXT_LEVEL, this.onNextLevel, this);
 
-        // Загружаем текущий уровень
         this.loadCurrentLevel();
     }
 
@@ -132,9 +124,6 @@ export default class GameController extends cc.Component {
             this.isProcessing = false;
         }, 0.5);
     }
-
-    // ... остальной код без изменений: spawnTile, handleTouch, adaptGridScale и т.д.
-    // ВСЁ ОСТАЛЬНОЕ МОЖНО ОСТАВИТЬ КАК ЕСТЬ
 
     private spawnTile(r: number, c: number, colorID: number): cc.Node {
         const tileNode = PoolManager.instance.getTile();
@@ -228,7 +217,7 @@ export default class GameController extends cc.Component {
         const tileNode = this.getNodeAt(r, c);
         if (tileNode) {
             const worldPos = tileNode.parent.convertToWorldSpaceAR(tileNode.getPosition());
-            this.showScoreAnimation(worldPos, points);
+            EffectManager.instance.showScoreAnimation(worldPos, points);
         }
         this.data.useMove();
         this.data.addScore(points);
@@ -353,37 +342,6 @@ export default class GameController extends cc.Component {
         });
     }
 
-    private showScoreAnimation(worldPos: cc.Vec2, amount: number) {
-        const popup = PoolManager.instance.getScorePopup();
-        if (!popup) return;
-
-        const canvas = cc.find("Canvas");
-        popup.parent = canvas;
-
-        popup.stopAllActions();
-        popup.opacity = 255;
-        popup.scale = 1;
-        popup.zIndex = cc.macro.MAX_ZINDEX;
-
-        const localPos = canvas.convertToNodeSpaceAR(worldPos);
-        popup.setPosition(localPos);
-
-        const label = popup.getComponent(cc.Label) || popup.getComponentInChildren(cc.Label);
-        if (label) {
-            label.string = `+${amount}`;
-        }
-
-        cc.tween(popup)
-            .parallel(
-                cc.tween().by(0.8, { y: 150 }, { easing: 'sineOut' }),
-                cc.tween().to(0.8, { opacity: 0 })
-            )
-            .call(() => {
-                PoolManager.instance.putScorePopup(popup);
-            })
-            .start();
-    }
-
     private activateBooster(r: number, c: number, type: number) {
         if (this.isProcessing && this._activeExplosionsCount === 0) return;
 
@@ -394,29 +352,6 @@ export default class GameController extends cc.Component {
         } else {
             this.executeSingleBooster(r, c, type);
         }
-    }
-
-    private spawnExplosionFXByPos(pos: cc.Vec2, fxType: number) {
-        const fx = PoolManager.instance.getEffect(fxType);
-        if (!fx) return;
-
-        fx.active = false;
-        fx.parent = this.gridContainer;
-        fx.zIndex = cc.macro.MAX_ZINDEX;
-        fx.setPosition(pos.x, pos.y);
-        fx.active = true;
-
-        const ps = fx.getComponent(cc.ParticleSystem);
-        if (ps) {
-            ps.stopSystem();
-            ps.resetSystem();
-        }
-
-        this.scheduleOnce(() => {
-            if (cc.isValid(fx) && fx.parent) {
-                PoolManager.instance.putEffect(fx, fxType);
-            }
-        }, 1.2);
     }
 
     private findNeighborBooster(r: number, c: number): {r: number, c: number, type: number} | null {
@@ -441,18 +376,13 @@ export default class GameController extends cc.Component {
         const isRocket2 = type2 === 6 || type2 === 7;
         const isBomb = type1 === 8 || type2 === 8;
 
+        const pos = this.getScreenPosition(r1, c1);
+
         if ((isRocket1 && isRocket2) || (isRocket1 && isBomb) || (isRocket2 && isBomb)) {
-            for (let i = 0; i < this._currentCols; i++) affected.push({ r: r1, c: i });
-            for (let i = 0; i < this._currentRows; i++) affected.push({ r: i, c: c1 });
-            const pos = this.getScreenPosition(r1, c1);
-            this.spawnCrossFX(pos);
-            if (isBomb) this.spawnExplosionFXByPos(pos, 3);
-        }
-        else if (type1 === 9 || type2 === 9) {
-            for (let i = 0; i < this._currentRows; i++) {
-                for (let j = 0; j < this._currentCols; j++) affected.push({ r: i, c: j });
-            }
-            this.spawnExplosionFXByPos(this.getScreenPosition(r1, c1), 3);
+            EffectManager.instance.spawnCrossFX(this.gridContainer, pos); //
+            if (isBomb) EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 3);
+        } else if (type1 === 9 || type2 === 9) {
+            EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 3);
         }
 
         this.executeExplosion(affected, epicenter);
@@ -460,7 +390,7 @@ export default class GameController extends cc.Component {
 
     private async executeExplosion(coords: { r: number, c: number }[], epicenter?: { r: number, c: number }) {
         this._activeExplosionsCount++;
-        GameController.shakeCamera();
+        EffectManager.instance.shakeCamera();
 
         if (epicenter) {
             this.sortCoordsByEpicenter(coords, epicenter);
@@ -498,7 +428,8 @@ export default class GameController extends cc.Component {
 
         const type = epiNode.getComponent(TileComponent).type;
         const pos = this.getScreenPosition(epi.r, epi.c);
-        this.playExplosionEffects(pos, type);
+
+        EffectManager.instance.playExplosionEffects(this.gridContainer, pos, type);
 
         this.model.clearCells([epi]);
         PoolManager.instance.putBooster(epiNode, type);
@@ -512,35 +443,12 @@ export default class GameController extends cc.Component {
         const type = comp.type;
         const pos = this.getScreenPosition(r, c);
 
-        this.playExplosionEffects(pos, type);
+        EffectManager.instance.playExplosionEffects(this.gridContainer, pos, type);
 
         if (type >= 6 && type <= 9) {
             this.handleBoosterChainReaction(r, c, type, epicenter, node);
         } else {
             this.handleRegularTileDestruction(node, type, r, c);
-        }
-    }
-
-    private playExplosionEffects(pos: cc.Vec2, tileType: number) {
-        switch (tileType) {
-            case 0:
-                this.spawnExplosionFXByPos(pos, 0);
-                break;
-            case 6:
-                this.spawnExplosionFXByPos(pos, 1);
-                AudioManager.instance.play('booster');
-                break;
-            case 7:
-                this.spawnExplosionFXByPos(pos, 2);
-                AudioManager.instance.play('booster');
-                break;
-            case 8:
-            case 9:
-                this.spawnExplosionFXByPos(pos, 3);
-                AudioManager.instance.playBlastSpam();
-                break;
-            default:
-                this.spawnExplosionFXByPos(pos, 0);
         }
     }
 
@@ -552,7 +460,7 @@ export default class GameController extends cc.Component {
         const worldPos = this.gridContainer.convertToWorldSpaceAR(localPos);
         const points = this.config.economy.scoreTile;
         this.data.addScore(points);
-        this.showScoreAnimation(worldPos, points);
+        EffectManager.instance.showScoreAnimation(worldPos, points);
 
         node.getComponent(TileComponent).destroyTile(() => {
             PoolManager.instance.putTile(node);
@@ -566,11 +474,6 @@ export default class GameController extends cc.Component {
             this.activateBooster(r, c, type);
             PoolManager.instance.putBooster(node, type);
         }
-    }
-
-    private spawnCrossFX(pos: cc.Vec2) {
-        this.spawnExplosionFXByPos(pos, 1);
-        this.spawnExplosionFXByPos(pos, 2);
     }
 
     private finishExplosionWave() {
@@ -608,17 +511,6 @@ export default class GameController extends cc.Component {
         }
 
         this.executeExplosion(affected, { r, c });
-    }
-
-    private static shakeCamera() {
-        const mainNode = cc.find("Canvas/Main Camera");
-        if (!mainNode) return;
-
-        cc.tween(mainNode)
-            .by(0.05, { x: 10, y: 10 })
-            .by(0.05, { x: -20, y: -10 })
-            .by(0.05, { x: 10, y: 0 })
-            .start();
     }
 
     private spawnBooster(r: number, c: number, type: number) {

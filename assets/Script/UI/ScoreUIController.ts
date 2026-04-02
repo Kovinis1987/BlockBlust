@@ -1,4 +1,4 @@
-﻿import DataService from "./DataService";
+﻿import DataService from "../DataService";
 
 const { ccclass, property } = cc._decorator;
 
@@ -43,7 +43,6 @@ export default class ScoreUIController extends cc.Component {
     }
 
     onDestroy() {
-        // Обязательно отписываемся, чтобы не было утечек памяти
         this.dataService.eventTarget.off('score-changed', this.updateScore, this);
         this.dataService.eventTarget.off('moves-changed', this.updateMoves, this);
     }

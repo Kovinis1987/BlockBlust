@@ -1,7 +1,7 @@
-﻿import DataService from "./DataService";
-import ccclass = cc._decorator.ccclass;
-import {GameState} from "./Enum/GameState";
+﻿import ccclass = cc._decorator.ccclass;
 import property = cc._decorator.property;
+import {GameState} from "../Enum/GameState";
+import DataService from "../DataService";
 
 @ccclass
 export default class WinWindow extends cc.Component {
@@ -27,7 +27,6 @@ export default class WinWindow extends cc.Component {
     }
 
     public hide() {
-        // 1. Увеличиваем индекс в синглтоне
         DataService.instance.nextLevel();
 
         cc.tween(this.panel)
@@ -35,8 +34,6 @@ export default class WinWindow extends cc.Component {
             .call(() => {
                 this.panel.active = false;
                 this.panel.opacity = 255;
-
-                // 2. Генерируем событие загрузки следующего уровня
                 DataService.instance.eventTarget.emit(DataService.EVT_NEXT_LEVEL);
             })
             .start();
