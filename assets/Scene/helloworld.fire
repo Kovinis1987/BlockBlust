@@ -200,7 +200,7 @@
     "_id": "11rmJdYAxMsq2nl/t1YzLK"
   },
   {
-    "__type__": "591d8yMIY5Lip2ObkDgE/XB",
+    "__type__": "54461d0rXtEVJgVsM1DyG1K",
     "_name": "",
     "_objFlags": 0,
     "node": {
@@ -216,12 +216,12 @@
     "animations": {
       "__id__": 7
     },
-    "_id": "08KkOG9r1FP6lnSK+ML1Cm"
+    "_id": "09KL9SiEhAcL2aUKCszBRz"
   },
   {
     "__type__": "GridSettings",
-    "paddingLeft": 50,
-    "paddingBottom": 50,
+    "paddingLeft": 35,
+    "paddingBottom": 25,
     "spacingX": 5,
     "spacingY": 5
   },
@@ -726,7 +726,7 @@
       "array": [
         0,
         0,
-        760.3703045227372,
+        578.504969728005,
         0,
         0,
         0,

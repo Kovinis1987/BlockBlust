@@ -1,4 +1,4 @@
-import GameConfig from "./GameConfig";
+import GameConfig from "./Config/GameConfig";
 
 export default class GridModel {
     private grid: number[][] = [];

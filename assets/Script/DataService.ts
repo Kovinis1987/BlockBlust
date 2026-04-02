@@ -1,4 +1,4 @@
-﻿import {GameState} from "./GameState";
+﻿import {GameState} from "./Enum/GameState";
 
 export default class DataService {
     private static _instance: DataService;
@@ -13,16 +13,23 @@ export default class DataService {
     public static readonly EVT_CONTINUE = 'request-continue';
     public static readonly EVT_TELEPORT_USED = 'booster-teleport-used';
     public static readonly EVT_NEXT_LEVEL = 'request-next-level';
+    public static readonly EVT_LEVEL_LOADED = 'level-loaded';
+    public static readonly EVT_LEVEL_DATA_LOADED = 'level-data-loaded';
+    public static readonly EVT_GRID_SIZE_CHANGED = 'grid-size-changed';
 
-    // Состояние игры
+
+    // === Игровое состояние ===
     private _score: number = 0;
     private _moves: number = 25;
     private _shuffleAttempts: number = 3;
     private _gameState: GameState = GameState.PLAYING;
 
-    // Данные уровня
+    // === Данные уровня ===
     private _targetScore: number = 1000;
     private _currentLevel: number = 0;
+    private _rows: number = 8;
+    private _cols: number = 8;
+    private _tilesData: number[] | null = null; // исходные данные тайлов
 
     // Геттеры
     get score() { return this._score; }
@@ -30,6 +37,11 @@ export default class DataService {
     get shuffleAttempts() { return this._shuffleAttempts; }
     get gameState() { return this._gameState; }
     get targetScore() { return this._targetScore; }
+    get currentLevel() { return this._currentLevel; }
+    set currentLevel(value: number) { this._currentLevel = value; }
+    get rows() { return this._rows; }
+    get cols() { return this._cols; }
+    get tilesData() { return this._tilesData; }
 
     /**
      * Сброс данных при старте уровня
@@ -42,7 +54,14 @@ export default class DataService {
         this._shuffleAttempts = 3;
         this._gameState = GameState.PLAYING;
 
-        this.notifyAll();
+        // Уведомляем об изменениях
+        this.eventTarget.emit('score-changed', this._score);
+        this.eventTarget.emit('moves-changed', this._moves);
+        this.eventTarget.emit('shuffle-changed', this._shuffleAttempts);
+        this.eventTarget.emit('state-changed', this._gameState);
+        this.eventTarget.emit(DataService.EVT_LEVEL_LOADED, level);
+        // this.eventTarget.emit(DataService.EVT_GRID_SIZE_CHANGED, { rows, cols });
+        // this.eventTarget.emit(DataService.EVT_LEVEL_DATA_LOADED, { rows, cols, tilesData });
     }
 
     public continueGame(extraMoves: number) {

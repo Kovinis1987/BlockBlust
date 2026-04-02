@@ -1,6 +1,6 @@
 ﻿import DataService from "./DataService";
 import ccclass = cc._decorator.ccclass;
-import {GameState} from "./GameState";
+import {GameState} from "./Enum/GameState";
 import property = cc._decorator.property;
 
 @ccclass
