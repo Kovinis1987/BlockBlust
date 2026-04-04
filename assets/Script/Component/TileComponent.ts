@@ -2,6 +2,7 @@ const { ccclass, property } = cc._decorator;
 
 @ccclass
 export default class TileComponent extends cc.Component {
+
     @property(cc.Sprite)
     sprite: cc.Sprite = null;
 
@@ -14,6 +15,9 @@ export default class TileComponent extends cc.Component {
 
     get type(): number { return this._type; }
     get gridPos(): cc.Vec2 { return this._gridPos; }
+    set gridPos(value: cc.Vec2) {
+        this._gridPos = value;
+    }
 
     onLoad() {
         // Делаем ноду кликабельной напрямую

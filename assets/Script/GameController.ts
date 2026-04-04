@@ -7,13 +7,17 @@ import LevelManager from "./Service/LevelManager";
 import EffectManager from "./Service/EffectManager";
 import TileComponent from "./Component/TileComponent";
 import GridModel from "./Component/GridModel";
+import BoosterButton from "./Component/BoosterButton";
 
-const { ccclass, property } = cc._decorator;
+const {ccclass, property} = cc._decorator;
 
 @ccclass
 export default class GameController extends cc.Component {
     @property(cc.Node)
     gridContainer: cc.Node = null;
+    
+    @property(BoosterButton)
+    boosterButtonTeleport: BoosterButton = null;
 
     @property(cc.Integer)
     currentLevel: number = 0;
@@ -36,6 +40,9 @@ export default class GameController extends cc.Component {
     private _currentCols: number = 8;
     private _activeExplosionsCount: number = 0;
 
+    private firstTile: cc.Node | null = null;
+    private secondTile: cc.Node | null = null;
+
     private data: DataService;
 
     onLoad() {
@@ -45,6 +52,7 @@ export default class GameController extends cc.Component {
         this.data.eventTarget.on(DataService.EVT_RESTART, this.restartLevel, this);
         this.data.eventTarget.on(DataService.EVT_CONTINUE, this.handleContinue, this);
         this.data.eventTarget.on(DataService.EVT_NEXT_LEVEL, this.onNextLevel, this);
+        this.boosterButtonTeleport.node.on('booster-teleport-toggle', this.onTeleportModeToggle, this);
 
         this.loadCurrentLevel();
     }
@@ -102,7 +110,7 @@ export default class GameController extends cc.Component {
                     node.setPosition(targetPos.x, targetPos.y);
 
                     const comp = node.getComponent(TileComponent);
-                    comp.init(rawValue, r, c, (row, col) => this.activateBooster(row, col, rawValue));
+                    comp.init(rawValue, r, c, (row, col) => this.onTileClick(row, col));
                 } else {
                     const colorID = rawValue === 0 ? Math.floor(Math.random() * 4) + 2 : rawValue;
                     this.model.setTile(r, c, colorID);
@@ -114,7 +122,7 @@ export default class GameController extends cc.Component {
                     const delay = (r * 0.05) + (c * 0.01);
                     cc.tween(node)
                         .delay(delay)
-                        .to(0.3, { scale: 1 }, { easing: 'backOut' })
+                        .to(0.3, {scale: 1}, {easing: 'backOut'})
                         .start();
                 }
             }
@@ -133,7 +141,7 @@ export default class GameController extends cc.Component {
         tileNode.setPosition(cc.v3(pos.x, pos.y, 0));
 
         const comp = tileNode.getComponent(TileComponent);
-        comp.init(colorID, r, c, (row, col) => this.tryBlast(row, col));
+        comp.init(colorID, r, c, (row, col) => this.onTileClick(row, col));
         return tileNode;
     }
 
@@ -145,6 +153,16 @@ export default class GameController extends cc.Component {
         return node;
     }
 
+    private spawnBooster(r: number, c: number, type: number) {
+        this.model.setTile(r, c, type);
+        const node = PoolManager.instance.getBooster(type);
+        node.parent = this.gridContainer;
+        node.setPosition(this.getScreenPosition(r, c));
+
+        const comp = node.getComponent(TileComponent);
+        comp.init(type, r, c, (row, col) => this.onTileClick(row, col));
+    }
+
     private getScreenPosition(r: number, c: number): cc.Vec2 {
         const g = this.config.grid;
         const gridW = this.gridContainer.width;
@@ -154,6 +172,30 @@ export default class GameController extends cc.Component {
         const y = -gridH / 2 + g.paddingBottom + (r * (this.tileSizeY + g.spacingY)) + (this.tileSizeY / 2);
 
         return cc.v2(x, y);
+    }
+
+    private adaptGridScale() {
+        const maxW = cc.winSize.width - 80;
+        const maxH = cc.winSize.height - 450;
+        const gridW = this._currentCols * this.tileSizeX;
+        const gridH = this._currentRows * this.tileSizeY;
+        const scaleX = maxW / gridW;
+        const scaleY = maxH / gridH;
+        this.gridContainer.scale = Math.min(scaleX, scaleY, 1);
+        this.gridContainer.opacity = 0;
+        cc.tween(this.gridContainer)
+            .to(0.3, {opacity: 255})
+            .start();
+    }
+
+    private setupGridSize(rows: number, cols: number) {
+        const pLeft = 55, pRight = 55, pTop = 55, pBottom = 55;
+        const spacingX = 4, spacingY = 4;
+
+        const totalW = pLeft + pRight + (cols * this.tileSizeX) + ((cols - 1) * spacingX);
+        const totalH = pTop + pBottom + (rows * this.tileSizeY) + ((rows - 1) * spacingY);
+
+        this.gridContainer.setContentSize(totalW, totalH);
     }
 
     private handleTouch(event: cc.Event.EventTouch) {
@@ -171,33 +213,110 @@ export default class GameController extends cc.Component {
         const c = Math.floor(relativeX / this.tileSizeX);
         const r = Math.floor(relativeY / this.tileSizeY);
 
-        if (r >= 0 && r < this._currentRows && c >= 0 && c < this._currentCols) {
-            this.tryBlast(r, c);
+        if (r < 0 || r >= this._currentRows || c < 0 || c >= this._currentCols) return;
+
+        if (this.data.gameState === GameState.BOOSTER_TELEPORT) {
+            this.handleTeleportClick(r, c);
+            return;
+        }
+
+        this.onTileClick(r, c);
+    }
+
+    private handleTeleportClick(r: number, c: number) {
+        const node = this.getNodeAt(r, c);
+        if (!node || this.model.getTile(r, c) === 1) return; // Препятствия нельзя двигать
+
+        if (this.firstTile === null) {
+            // Первый выбор
+            this.firstTile = node;
+            cc.tween(node)
+                .to(0.1, { scale: 1.2 })
+                .call(() => {
+                    node.zIndex = 100;
+                    node.parent.sortAllChildren(); // Для Cocos 2.4
+                })
+                .start();
+        } else if (this.firstTile === node) {
+            // Кликнули на тот же тайл — снимаем выделение
+            this.clearTeleportSelection();
+        } else {
+            // Второй выбор — начинаем обмен
+            this.secondTile = node;
+            this.performTeleportSwap();
         }
     }
 
-    private adaptGridScale() {
-        const maxW = cc.winSize.width - 80;
-        const maxH = cc.winSize.height - 450;
-        const gridW = this._currentCols * this.tileSizeX;
-        const gridH = this._currentRows * this.tileSizeY;
-        const scaleX = maxW / gridW;
-        const scaleY = maxH / gridH;
-        this.gridContainer.scale = Math.min(scaleX, scaleY, 1);
-        this.gridContainer.opacity = 0;
-        cc.tween(this.gridContainer)
-            .to(0.3, { opacity: 255 })
+    private performTeleportSwap() {
+        if (!this.firstTile || !this.secondTile) return;
+
+        const comp1 = this.firstTile.getComponent(TileComponent);
+        const comp2 = this.secondTile.getComponent(TileComponent);
+        const pos1 = this.firstTile.position;
+        const pos2 = this.secondTile.position;
+
+        const gridPos1 = comp1.gridPos;
+        const gridPos2 = comp2.gridPos;
+
+        const tempType = this.model.getTile(gridPos1.y, gridPos1.x);
+        this.model.setTile(gridPos1.y, gridPos1.x, this.model.getTile(gridPos2.y, gridPos2.x));
+        this.model.setTile(gridPos2.y, gridPos2.x, tempType);
+
+        this.isProcessing = true;
+
+        cc.tween(this.firstTile)
+            .to(0.3, { position: pos2 }, { easing: 'quadOut' })
+            .call(() => {
+                comp1.gridPos = cc.v2(gridPos2.x, gridPos2.y);
+                this.firstTile.zIndex = 0;
+                this.firstTile.parent.sortAllChildren();
+            })
             .start();
+
+        cc.tween(this.secondTile)
+            .to(0.3, { position: pos1 }, { easing: 'quadOut' })
+            .call(() => {
+                comp2.gridPos = cc.v2(gridPos1.x, gridPos1.y);
+                this.secondTile.zIndex = 0;
+                this.secondTile.parent.sortAllChildren();
+
+                // Завершаем операцию
+                this.finishTeleport();
+            })
+            .start();
+
+        AudioManager.instance.play('swap');
     }
 
-    private setupGridSize(rows: number, cols: number) {
-        const pLeft = 55, pRight = 55, pTop = 55, pBottom = 55;
-        const spacingX = 4, spacingY = 4;
+    private finishTeleport() {
+        this.isProcessing = false;
+        this.data.setGameState(GameState.PLAYING);
 
-        const totalW = pLeft + pRight + (cols * this.tileSizeX) + ((cols - 1) * spacingX);
-        const totalH = pTop + pBottom + (rows * this.tileSizeY) + ((rows - 1) * spacingY);
+        this.boosterButtonTeleport.consume();
 
-        this.gridContainer.setContentSize(totalW, totalH);
+        const event = new cc.Event.EventCustom('booster-teleport-toggle', true);
+        event.detail = {active: false};
+        this.boosterButtonTeleport.node.dispatchEvent(event);
+
+        this.clearTeleportSelection();
+        this.checkPossibleMoves();
+        DataService.instance.teleportBoosters--;
+    }
+
+    private clearTeleportSelection() {
+        if (this.firstTile) {
+            cc.tween(this.firstTile).to(0.1, { scale: 1 }).start();
+            this.firstTile.zIndex = 0;
+            this.firstTile = null;
+        }
+        if (this.secondTile) {
+            cc.tween(this.secondTile).to(0.1, { scale: 1 }).start();
+            this.secondTile.zIndex = 0;
+            this.secondTile = null;
+        }
+        if (this.firstTile || this.secondTile) {
+            cc.director.getScene().getChildByName('Canvas').getChildByName('Grid').sortAllChildren();
+        }
     }
 
     private tryBlast(r: number, c: number) {
@@ -240,6 +359,21 @@ export default class GameController extends cc.Component {
         });
     }
 
+    private onTileClick(r: number, c: number) {
+        if (this.isProcessing) return;
+
+        if (this.data.gameState === GameState.BOOSTER_TELEPORT) {
+            this.handleTeleportClick(r, c);
+        } else if (this.data.gameState === GameState.PLAYING) {
+            const type = this.model.getTile(r, c);
+            if (type >= 6 && type <= 9) {
+                this.activateBooster(r, c, type);
+            } else {
+                this.tryBlast(r, c);
+            }
+        }
+    }
+
     private handleContinue() {
         const extra = this.config.economy.continueMoves;
         DataService.instance.continueGame(extra);
@@ -275,7 +409,7 @@ export default class GameController extends cc.Component {
         this.gridContainer.children.forEach(node => {
             const comp = node.getComponent(TileComponent);
             const newType = this.model.getTile(comp.gridPos.y, comp.gridPos.x);
-            comp.init(newType, comp.gridPos.y, comp.gridPos.x, (r, c) => this.tryBlast(r, c));
+            comp.init(newType, comp.gridPos.y, comp.gridPos.x, (r, c) => this.onTileClick(r, c));
         });
     }
 
@@ -312,7 +446,7 @@ export default class GameController extends cc.Component {
             tileNode.setPosition(finalPos.x, startY); // начинается сверху
 
             const comp = tileNode.getComponent(TileComponent);
-            comp.init(n.type, n.r, n.c, (row, col) => this.tryBlast(row, col));
+            comp.init(n.type, n.r, n.c, (row, col) => this.onTileClick(row, col));
 
             // Анимация падения с easing
             comp.moveTo(n.r, n.c, finalPos, () => {
@@ -326,13 +460,13 @@ export default class GameController extends cc.Component {
             this.finalizePhysics();
         }
     }
-    
+
     private finalizePhysics() {
         this.isProcessing = false;
         this.checkPossibleMoves();
     }
 
-    private getNodesByCoords(coords: {r:number, c:number}[]): cc.Node[] {
+    private getNodesByCoords(coords: { r: number, c: number }[]): cc.Node[] {
         return this.gridContainer.children.filter(node => {
             const comp = node.getComponent(TileComponent);
             if (!comp) return false;
@@ -361,9 +495,22 @@ export default class GameController extends cc.Component {
         }
     }
 
-    private findNeighborBooster(r: number, c: number): {r: number, c: number, type: number} | null {
+    private onTeleportModeToggle(event: cc.Event.EventCustom) {
+        console.log("onTeleportModeToggle");
+        const { active } = event.detail;
+        if (active) {
+            this.data.setGameState(GameState.BOOSTER_TELEPORT);
+            console.log("GameState.BOOSTER_TELEPORT");
+            AudioManager.instance.play('ui_click');
+        } else {
+            this.data.setGameState(GameState.PLAYING);
+            this.clearTeleportSelection();
+        }
+    }
+
+    private findNeighborBooster(r: number, c: number): { r: number, c: number, type: number } | null {
         const neighbors = [
-            {r: r+1, c}, {r: r-1, c}, {r, c: c+1}, {r, c: c-1}
+            {r: r + 1, c}, {r: r - 1, c}, {r, c: c + 1}, {r, c: c - 1}
         ];
         for (const n of neighbors) {
             if (n.r >= 0 && n.r < this._currentRows && n.c >= 0 && n.c < this._currentCols) {
@@ -376,8 +523,8 @@ export default class GameController extends cc.Component {
 
     private executeCombo(r1: number, c1: number, type1: number, type2: number) {
         this.isProcessing = true;
-        let affected: {r: number, c: number}[] = [];
-        const epicenter = { r: r1, c: c1 };
+        let affected: { r: number, c: number }[] = [];
+        const epicenter = {r: r1, c: c1};
 
         const neighbor = this.findNeighborBooster(r1, c1);
         if (!neighbor) {
@@ -396,22 +543,21 @@ export default class GameController extends cc.Component {
 
         affected.push(epicenter);
 
-        affected.push({ r: r2, c: r2 });
+        affected.push({r: r2, c: r2});
 
         if ((isRocket1 && isRocket2) || (isRocket1 && isBomb) || (isRocket2 && isBomb)) {
             EffectManager.instance.spawnCrossFX(this.gridContainer, pos);
             if (isBomb) EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 3);
 
-            for (let i = 0; i < this._currentCols; i++) affected.push({ r: r1, c: i });
-            for (let i = 0; i < this._currentRows; i++) affected.push({ r: i, c: c1 });
+            for (let i = 0; i < this._currentCols; i++) affected.push({r: r1, c: i});
+            for (let i = 0; i < this._currentRows; i++) affected.push({r: i, c: c1});
             affected = this.removeDuplicates(affected);
-        }
-        else if (type1 === 8 || type2 === 8 || type1 === 9 || type2 === 9) {
+        } else if (type1 === 8 || type2 === 8 || type1 === 9 || type2 === 9) {
             EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 3);
             for (let i = r1 - 2; i <= r1 + 2; i++) {
                 for (let j = c1 - 2; j <= c1 + 2; j++) {
                     if (i >= 0 && i < this._currentRows && j >= 0 && j < this._currentCols) {
-                        affected.push({ r: i, c: j });
+                        affected.push({r: i, c: j});
                     }
                 }
             }
@@ -430,6 +576,7 @@ export default class GameController extends cc.Component {
             return true;
         });
     }
+
     private async executeExplosion(coords: { r: number, c: number }[], epicenter?: { r: number, c: number }) {
         this._activeExplosionsCount++;
         EffectManager.instance.shakeCamera();
@@ -481,7 +628,7 @@ export default class GameController extends cc.Component {
         if (!cc.isValid(node)) return;
 
         const comp = node.getComponent(TileComponent);
-        const { y: r, x: c } = comp.gridPos;
+        const {y: r, x: c} = comp.gridPos;
         const type = comp.type;
         const pos = this.getScreenPosition(r, c);
 
@@ -497,7 +644,7 @@ export default class GameController extends cc.Component {
     private handleRegularTileDestruction(node: cc.Node, type: number, r: number, c: number) {
         if (!cc.isValid(node) || !node.parent) return;
 
-        this.model.clearCells([{ r, c }]);
+        this.model.clearCells([{r, c}]);
         const localPos = this.getScreenPosition(r, c);
         const worldPos = this.gridContainer.convertToWorldSpaceAR(localPos);
         const points = this.config.economy.scoreTile;
@@ -509,10 +656,13 @@ export default class GameController extends cc.Component {
         });
     }
 
-    private handleBoosterChainReaction(r: number, c: number, type: number, epicenter: { r: number, c: number }, node: cc.Node) {
+    private handleBoosterChainReaction(r: number, c: number, type: number, epicenter: {
+        r: number,
+        c: number
+    }, node: cc.Node) {
         const isNotEpicenter = !epicenter || (r !== epicenter.r || c !== epicenter.c);
         if (isNotEpicenter) {
-            this.model.clearCells([{ r, c }]);
+            this.model.clearCells([{r, c}]);
             this.activateBooster(r, c, type);
             PoolManager.instance.putBooster(node, type);
         }
@@ -531,37 +681,27 @@ export default class GameController extends cc.Component {
 
         switch (type) {
             case 6:
-                for (let i = 0; i < this._currentCols; i++) affected.push({ r, c: i });
+                for (let i = 0; i < this._currentCols; i++) affected.push({r, c: i});
                 break;
             case 7:
-                for (let i = 0; i < this._currentRows; i++) affected.push({ r: i, c });
+                for (let i = 0; i < this._currentRows; i++) affected.push({r: i, c});
                 break;
             case 8:
                 for (let i = r - 2; i <= r + 2; i++) {
                     for (let j = c - 2; j <= c + 2; j++) {
                         if (i >= 0 && i < this._currentRows && j >= 0 && j < this._currentCols) {
-                            affected.push({ r: i, c: j });
+                            affected.push({r: i, c: j});
                         }
                     }
                 }
                 break;
             case 9:
                 for (let i = 0; i < this._currentRows; i++) {
-                    for (let j = 0; j < this._currentCols; j++) affected.push({ r: i, c: j });
+                    for (let j = 0; j < this._currentCols; j++) affected.push({r: i, c: j});
                 }
                 break;
         }
 
-        this.executeExplosion(affected, { r, c });
-    }
-
-    private spawnBooster(r: number, c: number, type: number) {
-        this.model.setTile(r, c, type);
-        const node = PoolManager.instance.getBooster(type);
-        node.parent = this.gridContainer;
-        node.setPosition(this.getScreenPosition(r, c));
-
-        const comp = node.getComponent(TileComponent);
-        comp.init(type, r, c, (row, col) => this.activateBooster(row, col, type));
+        this.executeExplosion(affected, {r, c});
     }
 }

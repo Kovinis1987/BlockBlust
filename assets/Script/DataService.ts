@@ -26,6 +26,8 @@ export default class DataService {
     private _cols: number = 8;
     private _tilesData: number[] | null = null;
 
+    private _teleportBoosters: number = 5;
+
     get score() { return this._score; }
     get moves() { return this._moves; }
     get gameState() { return this._gameState; }
@@ -36,6 +38,12 @@ export default class DataService {
     get cols() { return this._cols; }
     get tilesData() { return this._tilesData; }
 
+    get teleportBoosters(): number { return this._teleportBoosters; }
+    set teleportBoosters(value: number) {
+        this._teleportBoosters = Math.max(0, value);
+        this.eventTarget.emit('teleport-changed', this._teleportBoosters);
+    }
+
     public resetLevel(level: number, moves: number, target: number) {
         this._currentLevel = level;
         this._moves = moves;
@@ -43,7 +51,7 @@ export default class DataService {
         this._score = 0;
         this._shuffleAttempts = 3;
         this._gameState = GameState.PLAYING;
-
+        this.eventTarget.emit('teleport-changed', this._teleportBoosters);
         this.eventTarget.emit('score-changed', this._score);
         this.eventTarget.emit('moves-changed', this._moves);
         this.eventTarget.emit('shuffle-changed', this._shuffleAttempts);

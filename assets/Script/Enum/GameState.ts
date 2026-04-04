@@ -4,4 +4,5 @@
     LOST,
     SHUFFLING,
     BOOSTER_TELEPORT,
+    BOOSTER_BOMB,
 }

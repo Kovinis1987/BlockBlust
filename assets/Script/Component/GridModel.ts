@@ -220,4 +220,6 @@ export default class GridModel {
 
         return { type, orientation };
     }
+    
+    
 }
