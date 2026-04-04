@@ -9,7 +9,7 @@ export default class GameOverWindow extends cc.Component {
     @property(cc.Node) panel: cc.Node = null; // Сама панель окна
 
     onLoad() {
-        DataService.instance.eventTarget.on('state-changed', (state: GameState) => {
+        DataService.instance.eventTarget.on(DataService.EVT_STATE_CHANGED, (state: GameState) => {
             if (state === GameState.LOST) this.show();
         }, this);
 

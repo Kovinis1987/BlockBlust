@@ -3,7 +3,7 @@
 const { ccclass, property } = cc._decorator;
 
 @ccclass
-export default class BoosterButton extends cc.Component {
+export default class BoosterButtonTeleport extends cc.Component {
     @property(cc.Label)
     countLabel: cc.Label = null;
 
@@ -39,12 +39,12 @@ export default class BoosterButton extends cc.Component {
         this._isActive = !this._isActive;
         this.updateVisuals();
 
-        const event = new cc.Event.EventCustom('booster-teleport-toggle', true);
+        const event = new cc.Event.EventCustom(DataService.EVT_BOOSTER_TELEPORT, true);
         event.detail = { active: this._isActive };
         this.node.dispatchEvent(event);
     }
 
-    private updateVisuals() {
+    public updateVisuals() {
         if (this._isActive) {
             this.node.color = this.activeColor;
             cc.tween(this.node).to(0.1, { scale: 1.1 }).start();

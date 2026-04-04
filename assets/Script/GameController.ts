@@ -2,12 +2,13 @@ import PoolManager from "./PoolManager";
 import DataService from "./DataService";
 import AudioManager from "./AudioManager";
 import GameConfig from "./Config/GameConfig";
-import {GameState} from "./Enum/GameState";
 import LevelManager from "./Service/LevelManager";
 import EffectManager from "./Service/EffectManager";
 import TileComponent from "./Component/TileComponent";
 import GridModel from "./Component/GridModel";
-import BoosterButton from "./Component/BoosterButton";
+import BoosterButtonTeleport from "./Component/BoosterButtonTeleport";
+import BoosterBombButton from "./Component/BoosterBombButton";
+import {GameState} from "./Enum/GameState";
 
 const {ccclass, property} = cc._decorator;
 
@@ -16,8 +17,11 @@ export default class GameController extends cc.Component {
     @property(cc.Node)
     gridContainer: cc.Node = null;
     
-    @property(BoosterButton)
-    boosterButtonTeleport: BoosterButton = null;
+    @property(BoosterButtonTeleport)
+    boosterButtonTeleport: BoosterButtonTeleport = null;
+
+    @property(BoosterBombButton)
+    boosterButtonBomb: BoosterBombButton = null;
 
     @property(cc.Integer)
     currentLevel: number = 0;
@@ -52,7 +56,8 @@ export default class GameController extends cc.Component {
         this.data.eventTarget.on(DataService.EVT_RESTART, this.restartLevel, this);
         this.data.eventTarget.on(DataService.EVT_CONTINUE, this.handleContinue, this);
         this.data.eventTarget.on(DataService.EVT_NEXT_LEVEL, this.onNextLevel, this);
-        this.boosterButtonTeleport.node.on('booster-teleport-toggle', this.onTeleportModeToggle, this);
+        this.boosterButtonTeleport.node.on(DataService.EVT_BOOSTER_TELEPORT, this.onTeleportModeToggle, this);
+        this.boosterButtonBomb.node.on(DataService.EVT_BOOSTER_BOMB, this.onBombModeToggle, this);
 
         this.loadCurrentLevel();
     }
@@ -220,7 +225,74 @@ export default class GameController extends cc.Component {
             return;
         }
 
+        if (this.data.gameState === GameState.BOOSTER_BOMB) {
+            this.handleBombClick(r, c);
+            return;
+        }
+
         this.onTileClick(r, c);
+    }
+
+    private handleBombClick(centerR: number, centerC: number) {
+        console.log('🔥 handleBombClick triggered at:', centerR, centerC);
+        
+        const node = this.getNodeAt(centerR, centerC);
+        if (!node || this.model.getTile(centerR, centerC) === 1) {
+            console.log('No node or obstacle — skipped');
+            return;
+        }
+
+        console.log('Node found, proceeding...');
+
+        const radius = this.config.boosters.bombRadius;
+        const effectLevel = this.config.boosters.bombEffectLevel;
+
+        const targets: cc.Node[] = [];
+        for (let dr = -radius; dr <= radius; dr++) {
+            for (let dc = -radius; dc <= radius; dc++) {
+                const r = centerR + dr;
+                const c = centerC + dc;
+
+                if (r < 0 || r >= this._currentRows || c < 0 || c >= this._currentCols) continue;
+
+                const tileNode = this.getNodeAt(r, c);
+                if (tileNode && this.model.getTile(r, c) !== 1) {
+                    targets.push(tileNode);
+                }
+            }
+        }
+
+        this.isProcessing = true;
+        EffectManager.instance.shakeCamera();
+
+        const pos = this.getScreenPosition(centerR, centerC);
+        EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, effectLevel);
+
+        let destroyedCount = 0;
+        const totalCount = targets.length;
+
+        targets.forEach((tileNode) => {
+            const comp = tileNode.getComponent(TileComponent);
+            const { y: r, x: c } = comp.gridPos;
+            const type = comp.type;
+
+            if (type >= 6 && type <= 9) {
+                this.activateBooster(r, c, type);
+            } else {
+                this.model.clearCells([{ r, c }]);
+                comp.destroyTile(() => {
+                    PoolManager.instance.putTile(tileNode);
+                    destroyedCount++;
+                    if (destroyedCount === totalCount) {
+                        this.finishBombUse();
+                    }
+                });
+            }
+        });
+
+        if (totalCount === 0) {
+            this.finishBombUse();
+        }
     }
 
     private handleTeleportClick(r: number, c: number) {
@@ -301,6 +373,17 @@ export default class GameController extends cc.Component {
         this.clearTeleportSelection();
         this.checkPossibleMoves();
         DataService.instance.teleportBoosters--;
+    }
+    private finishBombUse() {
+        this.isProcessing = false;
+        this.data.setGameState(GameState.PLAYING);
+
+        if (this.boosterButtonBomb) {
+            this.boosterButtonBomb.consume();
+        }
+
+        this.checkPossibleMoves();
+        DataService.instance.bombBoosters--;
     }
 
     private clearTeleportSelection() {
@@ -500,11 +583,34 @@ export default class GameController extends cc.Component {
         const { active } = event.detail;
         if (active) {
             this.data.setGameState(GameState.BOOSTER_TELEPORT);
-            console.log("GameState.BOOSTER_TELEPORT");
+
+            if (this.boosterButtonBomb) {
+                this.boosterButtonBomb['_isActive'] = false;
+                this.boosterButtonBomb.updateVisuals();
+            }
+            
             AudioManager.instance.play('ui_click');
         } else {
             this.data.setGameState(GameState.PLAYING);
             this.clearTeleportSelection();
+        }
+    }
+
+    private onBombModeToggle(event: cc.Event.EventCustom) {
+        const { active } = event.detail;
+
+        if (active) {
+            this.data.setGameState(GameState.BOOSTER_BOMB);
+
+            if (this.boosterButtonTeleport) {
+                this.boosterButtonTeleport['_isActive'] = false;
+                this.boosterButtonTeleport.updateVisuals();
+            }
+
+            this.clearTeleportSelection();
+            AudioManager.instance.play('ui_click');
+        } else {
+            this.data.setGameState(GameState.PLAYING);
         }
     }
 
@@ -543,7 +649,7 @@ export default class GameController extends cc.Component {
 
         affected.push(epicenter);
 
-        affected.push({r: r2, c: r2});
+        affected.push({r: r2, c: c2});
 
         if ((isRocket1 && isRocket2) || (isRocket1 && isBomb) || (isRocket2 && isBomb)) {
             EffectManager.instance.spawnCrossFX(this.gridContainer, pos);
@@ -554,8 +660,9 @@ export default class GameController extends cc.Component {
             affected = this.removeDuplicates(affected);
         } else if (type1 === 8 || type2 === 8 || type1 === 9 || type2 === 9) {
             EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 3);
-            for (let i = r1 - 2; i <= r1 + 2; i++) {
-                for (let j = c1 - 2; j <= c1 + 2; j++) {
+            const radius = this.config.boosters.bombRadius;
+            for (let i = r1 - radius; i <= r1 + radius; i++) {
+                for (let j = c1 - radius; j <= c1 + radius; j++) {
                     if (i >= 0 && i < this._currentRows && j >= 0 && j < this._currentCols) {
                         affected.push({r: i, c: j});
                     }
@@ -686,9 +793,10 @@ export default class GameController extends cc.Component {
             case 7:
                 for (let i = 0; i < this._currentRows; i++) affected.push({r: i, c});
                 break;
-            case 8:
-                for (let i = r - 2; i <= r + 2; i++) {
-                    for (let j = c - 2; j <= c + 2; j++) {
+            case 8: 
+                const radius = this.config.boosters.bombRadius;
+                for (let i = r - radius; i <= r + radius; i++) {
+                    for (let j = c - radius; j <= c + radius; j++) {
                         if (i >= 0 && i < this._currentRows && j >= 0 && j < this._currentCols) {
                             affected.push({r: i, c: j});
                         }

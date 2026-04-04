@@ -13,7 +13,9 @@ export default class DataService {
     public static readonly EVT_CONTINUE = 'request-continue';
     public static readonly EVT_NEXT_LEVEL = 'request-next-level';
     public static readonly EVT_LEVEL_LOADED = 'level-loaded';
-
+    public static readonly EVT_BOOSTER_TELEPORT = 'booster-teleport-toggle';
+    public static readonly EVT_BOOSTER_BOMB = 'booster-bomb-toggle';
+    public static readonly EVT_STATE_CHANGED = 'state-changed';
 
     private _score: number = 0;
     private _moves: number = 25;
@@ -27,6 +29,7 @@ export default class DataService {
     private _tilesData: number[] | null = null;
 
     private _teleportBoosters: number = 5;
+    private _bombBoosters: number = 5;
 
     get score() { return this._score; }
     get moves() { return this._moves; }
@@ -36,12 +39,15 @@ export default class DataService {
     set currentLevel(value: number) { this._currentLevel = value; }
     get rows() { return this._rows; }
     get cols() { return this._cols; }
-    get tilesData() { return this._tilesData; }
-
     get teleportBoosters(): number { return this._teleportBoosters; }
     set teleportBoosters(value: number) {
         this._teleportBoosters = Math.max(0, value);
         this.eventTarget.emit('teleport-changed', this._teleportBoosters);
+    }
+
+    get bombBoosters(): number { return this._bombBoosters; }
+    set bombBoosters(value: number) {
+        this._bombBoosters = value;
     }
 
     public resetLevel(level: number, moves: number, target: number) {
@@ -85,6 +91,15 @@ export default class DataService {
         if (this._shuffleAttempts > 0) {
             this._shuffleAttempts--;
             this.eventTarget.emit('shuffle-changed', this._shuffleAttempts);
+            return true;
+        }
+        return false;
+    }
+
+    public useBombBooster(): boolean {
+        if (this.bombBoosters > 0) {
+            this.bombBoosters--;
+            this.eventTarget.emit('bomb-changed', this.bombBoosters);
             return true;
         }
         return false;
