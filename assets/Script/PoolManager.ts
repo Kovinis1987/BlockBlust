@@ -1,3 +1,5 @@
+import TileComponent from "./Component/TileComponent";
+
 const { ccclass, property } = cc._decorator;
 
 @ccclass
@@ -41,6 +43,12 @@ export default class PoolManager extends cc.Component {
 
     public putTile(tile: cc.Node) {
         tile.stopAllActions();
+        
+        const type = tile.getComponent(TileComponent).type;
+        if (type >= 6 && type <= 9) {
+            this.putBooster(tile, type);
+            return;
+        }
         this._tilePool.put(tile);
     }
 
