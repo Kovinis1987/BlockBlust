@@ -46,7 +46,7 @@ export default class DataService {
     }
 
     get bombBoosters(): number { return this._bombBoosters; }
-    set bombBoosters(value: number) {
+    private set bombBoosters(value: number) {
         this._bombBoosters = value;
     }
 
@@ -99,7 +99,7 @@ export default class DataService {
     public useBombBooster(): boolean {
         if (this.bombBoosters > 0) {
             this.bombBoosters--;
-            this.eventTarget.emit('bomb-changed', this.bombBoosters);
+            // this.eventTarget.emit('bomb-changed', this.bombBoosters);
             return true;
         }
         return false;

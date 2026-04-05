@@ -1,5 +1,4 @@
 ﻿import DataService from "../DataService";
-import GameController from "../GameController";
 
 const { ccclass, property } = cc._decorator;
 
@@ -43,7 +42,6 @@ export default class BoosterBombButton extends cc.Component {
         const event = new cc.Event.EventCustom(DataService.EVT_BOOSTER_BOMB, true);
         event.detail = { active: this._isActive };
         this.node.dispatchEvent(event);
-        console.log('💣 BoosterBombButton: состояние изменилось на', this._isActive);
     }
 
     public updateVisuals() {

@@ -52,7 +52,6 @@ export default class GameController extends cc.Component {
     onLoad() {
         this.data = DataService.instance;
 
-        this.node.on(cc.Node.EventType.TOUCH_END, this.handleTouch, this);
         this.data.eventTarget.on(DataService.EVT_RESTART, this.restartLevel, this);
         this.data.eventTarget.on(DataService.EVT_CONTINUE, this.handleContinue, this);
         this.data.eventTarget.on(DataService.EVT_NEXT_LEVEL, this.onNextLevel, this);
@@ -203,51 +202,22 @@ export default class GameController extends cc.Component {
         this.gridContainer.setContentSize(totalW, totalH);
     }
 
-    private handleTouch(event: cc.Event.EventTouch) {
-        if (this.isProcessing || !this.model) return;
-
-        const worldPoint = event.getLocation();
-        const localPoint = this.gridContainer.convertToNodeSpaceAR(worldPoint);
-
-        const totalWidth = this._currentCols * this.tileSizeX;
-        const totalHeight = this._currentRows * this.tileSizeY;
-
-        const relativeX = localPoint.x + totalWidth / 2;
-        const relativeY = localPoint.y + totalHeight / 2;
-
-        const c = Math.floor(relativeX / this.tileSizeX);
-        const r = Math.floor(relativeY / this.tileSizeY);
-
-        if (r < 0 || r >= this._currentRows || c < 0 || c >= this._currentCols) return;
-
-        if (this.data.gameState === GameState.BOOSTER_TELEPORT) {
-            this.handleTeleportClick(r, c);
-            return;
-        }
-
-        if (this.data.gameState === GameState.BOOSTER_BOMB) {
-            this.handleBombClick(r, c);
-            return;
-        }
-
-        this.onTileClick(r, c);
-    }
-
     private handleBombClick(centerR: number, centerC: number) {
-        console.log('🔥 handleBombClick triggered at:', centerR, centerC);
-        
+        console.log('💣 handleBombClick:', centerR, centerC);
+
         const node = this.getNodeAt(centerR, centerC);
         if (!node || this.model.getTile(centerR, centerC) === 1) {
-            console.log('No node or obstacle — skipped');
             return;
         }
-
-        console.log('Node found, proceeding...');
 
         const radius = this.config.boosters.bombRadius;
         const effectLevel = this.config.boosters.bombEffectLevel;
 
         const targets: cc.Node[] = [];
+        const coordsToClear: { r: number; c: number }[] = [];
+
+        const positions: Array<{ r: number; c: number; node: cc.Node }> = [];
+
         for (let dr = -radius; dr <= radius; dr++) {
             for (let dc = -radius; dc <= radius; dc++) {
                 const r = centerR + dr;
@@ -257,9 +227,16 @@ export default class GameController extends cc.Component {
 
                 const tileNode = this.getNodeAt(r, c);
                 if (tileNode && this.model.getTile(r, c) !== 1) {
+                    positions.push({ r, c, node: tileNode });
                     targets.push(tileNode);
+                    coordsToClear.push({ r, c });
                 }
             }
+        }
+
+        if (targets.length === 0) {
+            this.finishBombUse();
+            return;
         }
 
         this.isProcessing = true;
@@ -268,52 +245,53 @@ export default class GameController extends cc.Component {
         const pos = this.getScreenPosition(centerR, centerC);
         EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, effectLevel);
 
-        let destroyedCount = 0;
-        const totalCount = targets.length;
-
-        targets.forEach((tileNode) => {
-            const comp = tileNode.getComponent(TileComponent);
-            const { y: r, x: c } = comp.gridPos;
-            const type = comp.type;
-
+        for (const { r, c, node } of positions) {
+            const type = this.model.getTile(r, c);
             if (type >= 6 && type <= 9) {
+                console.log('💥 Бустер найден при взрыве бомбы:', r, c, 'type:', type);
                 this.activateBooster(r, c, type);
-            } else {
-                this.model.clearCells([{ r, c }]);
+            }
+        }
+
+        this.model.clearCells(coordsToClear);
+
+        let pendingAnimations = 0;
+
+        for (const { r, c, node } of positions) {
+            const type = this.model.getTile(r, c); 
+            const comp = node.getComponent(TileComponent);
+
+            if (type < 6 || type > 9) {
+                pendingAnimations++;
                 comp.destroyTile(() => {
-                    PoolManager.instance.putTile(tileNode);
-                    destroyedCount++;
-                    if (destroyedCount === totalCount) {
+                    PoolManager.instance.putTile(node);
+                    pendingAnimations--;
+                    if (pendingAnimations <= 0) {
                         this.finishBombUse();
                     }
                 });
             }
-        });
+        }
 
-        if (totalCount === 0) {
+        if (pendingAnimations === 0) {
             this.finishBombUse();
         }
-    }
-
-    private handleTeleportClick(r: number, c: number) {
+    }    private handleTeleportClick(r: number, c: number) {
         const node = this.getNodeAt(r, c);
-        if (!node || this.model.getTile(r, c) === 1) return; // Препятствия нельзя двигать
+        if (!node || this.model.getTile(r, c) === 1) return;
 
         if (this.firstTile === null) {
-            // Первый выбор
             this.firstTile = node;
             cc.tween(node)
                 .to(0.1, { scale: 1.2 })
                 .call(() => {
                     node.zIndex = 100;
-                    node.parent.sortAllChildren(); // Для Cocos 2.4
+                    node.parent.sortAllChildren();
                 })
                 .start();
         } else if (this.firstTile === node) {
-            // Кликнули на тот же тайл — снимаем выделение
             this.clearTeleportSelection();
         } else {
-            // Второй выбор — начинаем обмен
             this.secondTile = node;
             this.performTeleportSwap();
         }
@@ -351,8 +329,6 @@ export default class GameController extends cc.Component {
                 comp2.gridPos = cc.v2(gridPos1.x, gridPos1.y);
                 this.secondTile.zIndex = 0;
                 this.secondTile.parent.sortAllChildren();
-
-                // Завершаем операцию
                 this.finishTeleport();
             })
             .start();
@@ -374,16 +350,18 @@ export default class GameController extends cc.Component {
         this.checkPossibleMoves();
         DataService.instance.teleportBoosters--;
     }
+
     private finishBombUse() {
         this.isProcessing = false;
         this.data.setGameState(GameState.PLAYING);
 
         if (this.boosterButtonBomb) {
-            this.boosterButtonBomb.consume();
+            if (this.data.useBombBooster()) {
+                this.boosterButtonBomb.consume();
+            }
         }
 
-        this.checkPossibleMoves();
-        DataService.instance.bombBoosters--;
+        this.processGridPhysics();
     }
 
     private clearTeleportSelection() {
@@ -445,9 +423,17 @@ export default class GameController extends cc.Component {
     private onTileClick(r: number, c: number) {
         if (this.isProcessing) return;
 
+        if (this.data.gameState === GameState.BOOSTER_BOMB) {
+            this.handleBombClick(r, c);
+            return;
+        } 
+        
         if (this.data.gameState === GameState.BOOSTER_TELEPORT) {
             this.handleTeleportClick(r, c);
-        } else if (this.data.gameState === GameState.PLAYING) {
+            return;
+        } 
+        
+        if (this.data.gameState === GameState.PLAYING) {
             const type = this.model.getTile(r, c);
             if (type >= 6 && type <= 9) {
                 this.activateBooster(r, c, type);
@@ -500,7 +486,6 @@ export default class GameController extends cc.Component {
         const movements = this.model.processFalling();
         let activeAnimations = 0;
 
-        // 1. Анимация падения существующих тайлов
         movements.forEach(move => {
             const node = this.getNodeAt(move.from.r, move.from.c);
             if (node) {
@@ -515,30 +500,26 @@ export default class GameController extends cc.Component {
             }
         });
 
-        // 2. Создание новых тайлов СВЕРХУ для полностью пустых колонок
         const news = this.model.fillEmptyCells();
         news.forEach(n => {
             activeAnimations++;
             const tileNode = PoolManager.instance.getTile();
             tileNode.parent = this.gridContainer;
 
-            // Начальная позиция — выше сетки
             const startY = (this._currentRows * this.tileSizeY) / 2 + 200;
             const finalPos = this.getScreenPosition(n.r, n.c);
 
-            tileNode.setPosition(finalPos.x, startY); // начинается сверху
+            tileNode.setPosition(finalPos.x, startY); 
 
             const comp = tileNode.getComponent(TileComponent);
             comp.init(n.type, n.r, n.c, (row, col) => this.onTileClick(row, col));
 
-            // Анимация падения с easing
             comp.moveTo(n.r, n.c, finalPos, () => {
                 activeAnimations--;
                 if (activeAnimations <= 0) this.finalizePhysics();
             });
         });
 
-        // Если нет никаких анимаций — сразу завершаем
         if (movements.length === 0 && news.length === 0) {
             this.finalizePhysics();
         }
@@ -567,7 +548,14 @@ export default class GameController extends cc.Component {
     }
 
     private activateBooster(r: number, c: number, type: number) {
-        if (this.isProcessing && this._activeExplosionsCount === 0) return;
+        const pos = this.getScreenPosition(r, c);
+        EffectManager.instance.playExplosionEffects(this.gridContainer, pos, type);
+
+        if (type === 8) {
+            EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 2);
+        } else if (type === 9) {
+            EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 3);
+        }
 
         const neighborBooster = this.findNeighborBooster(r, c);
 
@@ -759,7 +747,7 @@ export default class GameController extends cc.Component {
         EffectManager.instance.showScoreAnimation(worldPos, points);
 
         node.getComponent(TileComponent).destroyTile(() => {
-            PoolManager.instance.putTile(node);
+            PoolManager.instance.putTile(node); // ✅ Только для обычных тайлов
         });
     }
 
@@ -771,7 +759,7 @@ export default class GameController extends cc.Component {
         if (isNotEpicenter) {
             this.model.clearCells([{r, c}]);
             this.activateBooster(r, c, type);
-            PoolManager.instance.putBooster(node, type);
+            PoolManager.instance.putBooster(node, type); // ✅ Правильный пул!
         }
     }
 
