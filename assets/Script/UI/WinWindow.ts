@@ -14,6 +14,9 @@ export default class WinWindow extends cc.Component {
                 this.show()
             }
         }, this);
+
+        this.panel.active = false;
+
     }
 
     private show() {
