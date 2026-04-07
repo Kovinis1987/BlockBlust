@@ -90,7 +90,6 @@ export default class DataService {
     public addScore(amount: number) {
         this._score += amount;
         this.eventTarget.emit('score-changed', this._score);
-        this.checkWinCondition();
     }
 
     public useMove() {
@@ -128,10 +127,12 @@ export default class DataService {
         this._currentLevel++;
     }
 
-    private checkWinCondition() {
+    public checkWinCondition(): boolean {
         if (this._score >= this._targetScore && this._gameState === GameState.PLAYING) {
             this.setGameState(GameState.WIN);
+            return true;
         }
+        return false;
     }
 
     private checkLoseCondition() {
