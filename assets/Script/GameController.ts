@@ -208,8 +208,6 @@ export default class GameController extends cc.Component {
             return;
         }
 
-        this.data.useMove();
-
         const radius = this.config.boosters.bombRadius;
         const positions: Array<{ r: number; c: number; node: cc.Node }> = [];
 
@@ -433,6 +431,7 @@ export default class GameController extends cc.Component {
             const type = this.model.getTile(r, c);
             if (type >= 6 && type <= 9) {
                 this.activateBooster(r, c, type);
+                this.data.useMove();
             } else {
                 this.tryBlast(r, c);
             }
@@ -526,7 +525,8 @@ export default class GameController extends cc.Component {
 
     private finalizePhysics() {
         this.isProcessing = false;
-        if (this.data.score >= this.data.targetScore) {
+        
+        if (this.data.checkWinCondition()) {
             this.data.setGameState(GameState.WIN);
         } else {
             this.checkPossibleMoves();
@@ -550,7 +550,6 @@ export default class GameController extends cc.Component {
         });
     }
     private activateBooster(r: number, c: number, type: number) {
-        this.data.useMove();
         const neighborBooster = this.findNeighborBooster(r, c);
 
         if (neighborBooster) {
