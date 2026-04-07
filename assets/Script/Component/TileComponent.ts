@@ -20,7 +20,6 @@ export default class TileComponent extends cc.Component {
     }
 
     onLoad() {
-        // Делаем ноду кликабельной напрямую
         this.node.on(cc.Node.EventType.TOUCH_END, this.onClick, this);
     }
 
@@ -29,14 +28,12 @@ export default class TileComponent extends cc.Component {
         this._gridPos = cc.v2(c, r);
         this._clickHandler = clickCallback;
 
-        // Если это обычный тайл (ID 2-5), меняем цвет
         if (id >= 2 && id <= 5) {
             const spriteIndex = id - 2;
             if (this.colors[spriteIndex]) {
                 this.sprite.spriteFrame = this.colors[spriteIndex];
             }
         }
-        // Если это бустер (6-9), спрайт уже настроен в префабе, ничего не трогаем
 
         this.node.scale = 1;
         this.node.opacity = 255;

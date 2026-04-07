@@ -1,4 +1,5 @@
-import PoolManager from "../PoolManager";
+import PoolManager from "./PoolManager";
+import AudioManager from "./AudioManager";
 
 const { ccclass } = cc._decorator;
 
@@ -36,13 +37,16 @@ export default class EffectManager {
         switch (tileType) {
             case 6: // Ракета H
                 this.spawnExplosionFX(container, pos, 1);
+                AudioManager.instance.play('blast');
                 break;
             case 7: // Ракета V
                 this.spawnExplosionFX(container, pos, 2);
+                AudioManager.instance.play('blast');
                 break;
             case 8: // Бомба
             case 9: // Мега
                 this.spawnExplosionFX(container, pos, 3);
+                AudioManager.instance.play('booster');
                 break;
             default: // Обычный блок
                 this.spawnExplosionFX(container, pos, 0);

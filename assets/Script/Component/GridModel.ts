@@ -33,7 +33,6 @@ export default class GridModel {
 
     public findGroup(row: number, col: number): { r: number, c: number }[] {
         const targetColor = this.grid[row][col];
-        // Препятствия (1) и пустые (-1) не образуют группы для взрыва
         if (targetColor === -1 || targetColor === 1) return [];
 
         const group: { r: number, c: number }[] = [];
@@ -96,8 +95,6 @@ export default class GridModel {
 
                     if (foundVertical) continue;
 
-                    // ПРАВИЛО 3: Диагональное обтекание (только если прямо сверху ПРЕПЯТСТВИЕ)
-                    // Если прямо над нами (r+1) стоит 1, пробуем взять из (r+1, c-1) или (r+1, c+1)
                     if (r + 1 < this.rows && this.grid[r + 1][c] === 1) {
                         for (let step of [-1, 1]) {
                             const sideCol = c + step;
@@ -118,11 +115,10 @@ export default class GridModel {
     }
 
     private moveTile(fromR: number, fromC: number, toR: number, toC: number, movements: any[]) {
-        // ПРАВИЛО 4: Никогда не перемещаем препятствия
         if (this.grid[fromR][fromC] === 1 || this.grid[toR][toC] === 1) return;
 
         this.grid[toR][toC] = this.grid[fromR][fromC];
-        this.grid[fromR][fromC] = -1; // Старое место становится пустым
+        this.grid[fromR][fromC] = -1;
         movements.push({ from: { r: fromR, c: fromC }, to: { r: toR, c: toC } });
     }
 
@@ -131,7 +127,7 @@ export default class GridModel {
         for (let c = 0; c < this.cols; c++) {
             for (let r = this.rows - 1; r >= 0; r--) {
                 if (this.grid[r][c] === -1) {
-                    const colorID = Math.floor(Math.random() * 4) + 2; // 2-5
+                    const colorID = Math.floor(Math.random() * 4) + 2;
                     this.grid[r][c] = colorID;
                     newTiles.push({ r, c, type: colorID });
                 }
@@ -144,9 +140,7 @@ export default class GridModel {
         for (let r = 0; r < this.rows; r++) {
             for (let c = 0; c < this.cols; c++) {
                 const type = this.grid[r][c];
-                // Если это бустер (6-10), ход есть
                 if (type >= 6 && type <= 10) return true;
-                // Если это обычный тайл, проверяем размер группы
                 if (type >= 2 && this.findGroup(r, c).length >= minGroup) return true;
             }
         }
@@ -154,7 +148,6 @@ export default class GridModel {
     }
 
     public shuffleOnlyColors() {
-        // Собираем все цветовые тайлы (ID 2-5), перемешиваем и расставляем обратно
         let colors: number[] = [];
         for (let r = 0; r < this.rows; r++) {
             for (let c = 0; c < this.cols; c++) {
@@ -164,7 +157,6 @@ export default class GridModel {
             }
         }
 
-        // Алгоритм Фишера-Йетса
         for (let i = colors.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [colors[i], colors[j]] = [colors[j], colors[i]];
@@ -186,7 +178,6 @@ export default class GridModel {
 
         if (count < rocketMin) return null;
 
-        // Определяем bounding box группы
         let minR = group[0].r, maxR = group[0].r;
         let minC = group[0].c, maxC = group[0].c;
 
@@ -197,23 +188,22 @@ export default class GridModel {
             maxC = Math.max(maxC, cell.c);
         }
 
-        const height = maxR - minR + 1; // строки
-        const width = maxC - minC + 1;  // столбцы
+        const height = maxR - minR + 1;
+        const width = maxC - minC + 1;
 
         let type: number;
         let orientation: 'h' | 'v' | undefined;
 
         if (count >= megaMin) {
-            type = 9; // мега (всё поле)
+            type = 9;
         } else if (count >= bombMin) {
-            type = 8; // бомба (5x5)
+            type = 8;
         } else if (count >= rocketMin) {
-            // Ракета: выбираем ориентацию по форме
             if (height > width) {
-                type = 7; // вертикальная ракета
+                type = 7;
                 orientation = 'v';
             } else {
-                type = 6; // горизонтальная ракета
+                type = 6;
                 orientation = 'h';
             }
         }

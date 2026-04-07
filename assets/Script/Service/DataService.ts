@@ -1,4 +1,4 @@
-﻿import {GameState} from "./Enum/GameState";
+﻿import {GameState} from "../Enum/GameState";
 
 export default class DataService {
     private static _instance: DataService;

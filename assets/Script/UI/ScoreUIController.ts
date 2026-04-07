@@ -1,4 +1,4 @@
-﻿import DataService from "../DataService";
+﻿import DataService from "../Service/DataService";
 
 const { ccclass, property } = cc._decorator;
 

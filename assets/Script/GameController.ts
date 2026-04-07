@@ -1,6 +1,3 @@
-import PoolManager from "./PoolManager";
-import DataService from "./DataService";
-import AudioManager from "./AudioManager";
 import GameConfig from "./Config/GameConfig";
 import LevelManager from "./Service/LevelManager";
 import EffectManager from "./Service/EffectManager";
@@ -9,6 +6,9 @@ import GridModel from "./Component/GridModel";
 import BoosterButtonTeleport from "./Component/BoosterButtonTeleport";
 import BoosterBombButton from "./Component/BoosterBombButton";
 import {GameState} from "./Enum/GameState";
+import PoolManager from "./Service/PoolManager";
+import DataService from "./Service/DataService";
+import AudioManager from "./Service/AudioManager";
 
 const {ccclass, property} = cc._decorator;
 
@@ -203,8 +203,6 @@ export default class GameController extends cc.Component {
     }
 
     private handleBombClick(centerR: number, centerC: number) {
-        console.log('💣 handleBombClick:', centerR, centerC);
-
         const node = this.getNodeAt(centerR, centerC);
         if (!node || this.model.getTile(centerR, centerC) === 1) {
             return;
@@ -244,11 +242,11 @@ export default class GameController extends cc.Component {
 
         const pos = this.getScreenPosition(centerR, centerC);
         EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, effectLevel);
+        AudioManager.instance.play('booster');
 
-        for (const { r, c, node } of positions) {
+        for (const { r, c} of positions) {
             const type = this.model.getTile(r, c);
             if (type >= 6 && type <= 9) {
-                console.log('💥 Бустер найден при взрыве бомбы:', r, c, 'type:', type);
                 this.activateBooster(r, c, type);
             }
         }
@@ -333,7 +331,7 @@ export default class GameController extends cc.Component {
             })
             .start();
 
-        AudioManager.instance.play('swap');
+        AudioManager.instance.play('switch');
     }
 
     private finishTeleport() {
@@ -388,7 +386,6 @@ export default class GameController extends cc.Component {
             this.getNodeAt(r, c).getComponent(TileComponent).shake();
             return;
         }
-        AudioManager.instance.play('click');
 
         const boosterData = this.model.getBoosterType(group);
         const points = group.length * 10;
@@ -426,8 +423,10 @@ export default class GameController extends cc.Component {
         if (this.data.gameState === GameState.BOOSTER_BOMB) {
             this.handleBombClick(r, c);
             return;
-        } 
+        }
         
+        AudioManager.instance.play('click');
+
         if (this.data.gameState === GameState.BOOSTER_TELEPORT) {
             this.handleTeleportClick(r, c);
             return;
@@ -567,7 +566,6 @@ export default class GameController extends cc.Component {
     }
 
     private onTeleportModeToggle(event: cc.Event.EventCustom) {
-        console.log("onTeleportModeToggle");
         const { active } = event.detail;
         if (active) {
             this.data.setGameState(GameState.BOOSTER_TELEPORT);
@@ -577,7 +575,7 @@ export default class GameController extends cc.Component {
                 this.boosterButtonBomb.updateVisuals();
             }
             
-            AudioManager.instance.play('ui_click');
+            AudioManager.instance.play('click');
         } else {
             this.data.setGameState(GameState.PLAYING);
             this.clearTeleportSelection();
@@ -596,7 +594,7 @@ export default class GameController extends cc.Component {
             }
 
             this.clearTeleportSelection();
-            AudioManager.instance.play('ui_click');
+            AudioManager.instance.play('click');
         } else {
             this.data.setGameState(GameState.PLAYING);
         }

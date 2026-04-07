@@ -11,6 +11,7 @@ export default class AudioManager extends cc.Component {
     @property({ type: cc.AudioClip }) boosterSfx: cc.AudioClip = null;
     @property({ type: cc.AudioClip }) fallSfx: cc.AudioClip = null;
     @property({ type: cc.AudioClip }) winSfx: cc.AudioClip = null;
+    @property({ type: cc.AudioClip }) switchBooster: cc.AudioClip = null;
 
     private _sfxVolume: number = 1.0;
     private _lastBlastTime: number = 0;
@@ -33,15 +34,6 @@ export default class AudioManager extends cc.Component {
         }
     }
 
-    public playBGM() {
-        if (this.bgm) cc.audioEngine.playMusic(this.bgm, true);
-    }
-
-    public playSFX(clip: cc.AudioClip, volumeScale: number = 1.0) {
-        if (!clip) return;
-        cc.audioEngine.playEffect(clip, false);
-    }
-
     public play(effectName: string) {
         switch(effectName) {
             case 'blast': this.playSFX(this.blastSfx); break;
@@ -49,6 +41,16 @@ export default class AudioManager extends cc.Component {
             case 'click': this.playSFX(this.clickSfx); break;
             case 'fall': this.playSFX(this.fallSfx, 0.5); break;
             case 'win': this.playSFX(this.winSfx); break;
+            case 'switch': this.playSFX(this.switchBooster); break;
         }
+    }
+
+    private playBGM() {
+        if (this.bgm) cc.audioEngine.playMusic(this.bgm, true);
+    }
+
+    private playSFX(clip: cc.AudioClip, volumeScale: number = 1.0) {
+        if (!clip) return;
+        cc.audioEngine.playEffect(clip, false);
     }
 }

@@ -330,22 +330,25 @@
     },
     "_enabled": true,
     "bgm": {
-      "__uuid__": "df3792aa-5868-4fdd-bfd7-e759c01a1d6b"
+      "__uuid__": "0683c780-02b3-463d-ace1-5362b322607b"
     },
     "clickSfx": {
       "__uuid__": "11610256-0613-477c-9e7f-be76e9a05645"
     },
     "blastSfx": {
-      "__uuid__": "dfa5fd8e-faba-4cc9-b297-20575e6e2664"
+      "__uuid__": "06fd2385-9ee2-41b6-9c31-376245320525"
     },
     "boosterSfx": {
-      "__uuid__": "a9a0438e-958e-4ffa-99b0-86d8a16cbfd2"
+      "__uuid__": "dfa5fd8e-faba-4cc9-b297-20575e6e2664"
     },
     "fallSfx": {
       "__uuid__": "e9edf42e-9abe-4b99-bab8-c5ec0daa3950"
     },
     "winSfx": {
       "__uuid__": "94c80589-04c1-4a48-847f-7e1a897a7770"
+    },
+    "switchBooster": {
+      "__uuid__": "e15dbca3-ba74-4f64-944b-1a63592dd59f"
     },
     "_id": "bb8fVw+gpBU6VtVDlXD0k4"
   },
@@ -737,7 +740,7 @@
       "array": [
         0,
         0,
-        713.8034144927434,
+        652.6223457738871,
         0,
         0,
         0,

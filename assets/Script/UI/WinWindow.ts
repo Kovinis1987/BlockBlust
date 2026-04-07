@@ -1,7 +1,8 @@
 ﻿import ccclass = cc._decorator.ccclass;
 import property = cc._decorator.property;
 import {GameState} from "../Enum/GameState";
-import DataService from "../DataService";
+import DataService from "../Service/DataService";
+import AudioManager from "../Service/AudioManager";
 
 @ccclass
 export default class WinWindow extends cc.Component {
@@ -12,6 +13,7 @@ export default class WinWindow extends cc.Component {
         DataService.instance.eventTarget.on(DataService.EVT_STATE_CHANGED, (state: GameState) => {
             if (state === GameState.WON) {
                 this.show()
+                AudioManager.instance.play("win");
             }
         }, this);
 
@@ -30,6 +32,7 @@ export default class WinWindow extends cc.Component {
     }
 
     public hide() {
+        AudioManager.instance.play("click");
         DataService.instance.nextLevel();
 
         cc.tween(this.panel)

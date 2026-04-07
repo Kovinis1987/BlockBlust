@@ -1,4 +1,5 @@
-﻿import DataService from "../DataService";
+﻿import DataService from "../Service/DataService";
+import AudioManager from "../Service/AudioManager";
 
 const { ccclass, property } = cc._decorator;
 
@@ -35,6 +36,7 @@ export default class BoosterButtonTeleport extends cc.Component {
 
     private onClick() {
         if (this._count <= 0) return;
+        AudioManager.instance.play("click");
 
         this._isActive = !this._isActive;
         this.updateVisuals();

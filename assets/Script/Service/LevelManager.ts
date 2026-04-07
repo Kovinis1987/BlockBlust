@@ -8,8 +8,6 @@ export default class LevelManager {
     }
 
     loadLevel(levelIndex: number, onComplete?: (data: LevelData) => void) {
-        console.log("LevelManager: загрузка уровня", levelIndex);
-
         cc.resources.load('configs/levels', cc.JsonAsset, (err, res: cc.JsonAsset) => {
             if (err) {
                 console.error("Ошибка загрузки levels.json:", err);
@@ -28,7 +26,6 @@ export default class LevelManager {
                 };
             } else {
                 data = res.json[levelIndex];
-                console.log("🎯 Данные уровня:", data);
             }
 
             if (onComplete) {

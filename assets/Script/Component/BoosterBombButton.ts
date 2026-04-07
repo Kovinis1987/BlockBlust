@@ -1,4 +1,5 @@
-﻿import DataService from "../DataService";
+﻿import DataService from "../Service/DataService";
+import AudioManager from "../Service/AudioManager";
 
 const { ccclass, property } = cc._decorator;
 
@@ -14,14 +15,14 @@ export default class BoosterBombButton extends cc.Component {
     private _isActive: boolean = false;
     private originalColor: cc.Color = null;
 
-    onLoad() {
+    public onLoad() {
         this.originalColor = this.node.color.clone();
-        this.node.on(cc.Node.EventType.TOUCH_END, this.onActivate, this);
+        this.node.on(cc.Node.EventType.TOUCH_END, this.onClick, this);
 
         DataService.instance.eventTarget.on('bomb-changed', (count: number) => {
             this.count = count;
         }, this);
-        this.count = DataService.instance.bombBoosters; // Предполагаем, что поле есть
+        this.count = DataService.instance.bombBoosters;
     }
 
     get count(): number { return this._count; }
@@ -33,8 +34,9 @@ export default class BoosterBombButton extends cc.Component {
         this.updateVisuals();
     }
 
-    onActivate() {
+    public onClick() {
         if (this._count <= 0) return;
+        AudioManager.instance.play("click");
 
         this._isActive = !this._isActive;
         this.updateVisuals();
