@@ -29,9 +29,6 @@ class AnimationsSettings {
 class BoosterSettings {
     @property({ type: cc.Integer, tooltip: "Радиус взрыва бомбы (в клетках)" })
     bombRadius: number = 3;
-
-    @property({ type: cc.Integer, tooltip: "Уровень эффекта взрыва (1–3)" })
-    bombEffectLevel: number = 3;
 }
 
 @ccclass

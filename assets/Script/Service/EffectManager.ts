@@ -1,5 +1,6 @@
 import PoolManager from "./PoolManager";
 import AudioManager from "./AudioManager";
+import EffectTypes from "../Enum/EffectTypes";
 
 const { ccclass } = cc._decorator;
 
@@ -11,8 +12,16 @@ export default class EffectManager {
         return this._instance;
     }
 
+    private _durations = {
+        [EffectTypes.TILE_NORMAL]: 0.5,
+        [EffectTypes.ROCKET_VERTICAL]: 0.6,
+        [EffectTypes.ROCKET_HORIZONTAL]: 0.6,
+        [EffectTypes.BOMB]: 1.0,
+        [EffectTypes.MEGA]: 1.2
+    };
+
     public spawnExplosionFX(container: cc.Node, pos: cc.Vec2, fxType: number) {
-        const fx = PoolManager.instance.getEffect(fxType);
+        const fx = PoolManager.instance.getEffect(Number(fxType));
         if (!fx) return;
 
         fx.parent = container;
@@ -25,37 +34,36 @@ export default class EffectManager {
             ps.stopSystem();
             ps.resetSystem();
         }
+        const duration = this._durations[fxType] || 1.0;
 
         cc.Canvas.instance.node.getComponent(cc.Component).scheduleOnce(() => {
             if (cc.isValid(fx)) {
                 PoolManager.instance.putEffect(fx, fxType);
             }
-        }, 1.2);
+        }, duration);
+
+        this.playExplosionSound(fxType);
     }
 
-    public playExplosionEffects(container: cc.Node, pos: cc.Vec2, tileType: number) {
-        switch (tileType) {
-            case 6: // Ракета H
-                this.spawnExplosionFX(container, pos, 1);
+    private playExplosionSound(fxType: number) {
+        switch (fxType) {
+            case EffectTypes.ROCKET_VERTICAL:
+            case EffectTypes.ROCKET_HORIZONTAL:
                 AudioManager.instance.play('blast');
                 break;
-            case 7: // Ракета V
-                this.spawnExplosionFX(container, pos, 2);
-                AudioManager.instance.play('blast');
-                break;
-            case 8: // Бомба
-            case 9: // Мега
-                this.spawnExplosionFX(container, pos, 3);
+            case EffectTypes.BOMB:
+            case EffectTypes.MEGA:
                 AudioManager.instance.play('booster');
                 break;
-            default: // Обычный блок
-                this.spawnExplosionFX(container, pos, 0);
+            default:
+                AudioManager.instance.play('explosion');
+                break;
         }
     }
 
     public spawnCrossFX(container: cc.Node, pos: cc.Vec2) {
-        this.spawnExplosionFX(container, pos, 1);
-        this.spawnExplosionFX(container, pos, 2);
+        this.spawnExplosionFX(container, pos, EffectTypes.ROCKET_VERTICAL);
+        this.spawnExplosionFX(container, pos, EffectTypes.ROCKET_HORIZONTAL);
     }
 
     public shakeCamera() {

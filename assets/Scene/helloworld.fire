@@ -245,8 +245,7 @@
   },
   {
     "__type__": "BoosterSettings",
-    "bombRadius": 2,
-    "bombEffectLevel": 3
+    "bombRadius": 2
   },
   {
     "__type__": "cc.PrefabInfo",
@@ -413,7 +412,6 @@
     "boosterButtonBomb": {
       "__id__": 65
     },
-    "currentLevel": 0,
     "scorePopupPrefab": {
       "__uuid__": "ceb79d17-da3a-4eab-81b6-cc737f434e55"
     },
@@ -740,7 +738,7 @@
       "array": [
         0,
         0,
-        652.6223457738871,
+        652.55248191432,
         0,
         0,
         0,

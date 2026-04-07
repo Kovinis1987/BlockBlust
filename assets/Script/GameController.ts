@@ -1,6 +1,5 @@
 import GameConfig from "./Config/GameConfig";
 import LevelManager from "./Service/LevelManager";
-import EffectManager from "./Service/EffectManager";
 import TileComponent from "./Component/TileComponent";
 import GridModel from "./Component/GridModel";
 import BoosterButtonTeleport from "./Component/BoosterButtonTeleport";
@@ -9,6 +8,8 @@ import {GameState} from "./Enum/GameState";
 import PoolManager from "./Service/PoolManager";
 import DataService from "./Service/DataService";
 import AudioManager from "./Service/AudioManager";
+import EffectManager from "./Service/EffectManager";
+import EffectTypes from "./Enum/EffectTypes";
 
 const {ccclass, property} = cc._decorator;
 
@@ -49,7 +50,6 @@ export default class GameController extends cc.Component {
     public onLoad() {
         this.data = DataService.instance;
 
-        this.data.eventTarget.on(DataService.EVT_RESTART, this.restartLevel, this);
         this.data.eventTarget.on(DataService.EVT_CONTINUE, this.handleContinue, this);
         this.data.eventTarget.on(DataService.EVT_NEXT_LEVEL, this.onNextLevel, this);
         this.boosterButtonTeleport.node.on(DataService.EVT_BOOSTER_TELEPORT, this.onTeleportModeToggle, this);
@@ -208,12 +208,9 @@ export default class GameController extends cc.Component {
             return;
         }
 
+        this.data.useMove();
+
         const radius = this.config.boosters.bombRadius;
-        const effectLevel = this.config.boosters.bombEffectLevel;
-
-        const targets: cc.Node[] = [];
-        const coordsToClear: { r: number; c: number }[] = [];
-
         const positions: Array<{ r: number; c: number; node: cc.Node }> = [];
 
         for (let dr = -radius; dr <= radius; dr++) {
@@ -226,13 +223,11 @@ export default class GameController extends cc.Component {
                 const tileNode = this.getNodeAt(r, c);
                 if (tileNode && this.model.getTile(r, c) !== 1) {
                     positions.push({ r, c, node: tileNode });
-                    targets.push(tileNode);
-                    coordsToClear.push({ r, c });
                 }
             }
         }
 
-        if (targets.length === 0) {
+        if (positions.length === 0) {
             this.finishBombUse();
             return;
         }
@@ -241,22 +236,24 @@ export default class GameController extends cc.Component {
         EffectManager.instance.shakeCamera();
 
         const pos = this.getScreenPosition(centerR, centerC);
-        EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, effectLevel);
+        EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, EffectTypes.BOMB);
         AudioManager.instance.play('booster');
 
-        for (const { r, c} of positions) {
+        for (const { r, c } of positions) {
             const type = this.model.getTile(r, c);
             if (type >= 6 && type <= 9) {
                 this.activateBooster(r, c, type);
             }
         }
 
+        const coordsToClear = positions.map(p => ({ r: p.r, c: p.c }));
         this.model.clearCells(coordsToClear);
 
-        let pendingAnimations = 0;
+        this.awardScoreForNodes(positions, pos);
 
+        let pendingAnimations = 0;
         for (const { r, c, node } of positions) {
-            const type = this.model.getTile(r, c); 
+            const type = this.model.getTile(r, c);
             const comp = node.getComponent(TileComponent);
 
             if (type < 6 || type > 9) {
@@ -274,7 +271,8 @@ export default class GameController extends cc.Component {
         if (pendingAnimations === 0) {
             this.finishBombUse();
         }
-    }    private handleTeleportClick(r: number, c: number) {
+    }    
+    private handleTeleportClick(r: number, c: number) {
         const node = this.getNodeAt(r, c);
         if (!node || this.model.getTile(r, c) === 1) return;
 
@@ -387,19 +385,17 @@ export default class GameController extends cc.Component {
             return;
         }
 
-        const boosterData = this.model.getBoosterType(group);
-        const points = group.length * 10;
-
-        this.isProcessing = true;
-        const tileNode = this.getNodeAt(r, c);
-        if (tileNode) {
-            const worldPos = tileNode.parent.convertToWorldSpaceAR(tileNode.getPosition());
-            EffectManager.instance.showScoreAnimation(worldPos, points);
-        }
         this.data.useMove();
-        this.data.addScore(points);
 
         const nodesToDestroy = this.getNodesByCoords(group);
+        const tileNode = this.getNodeAt(r, c);
+        
+        this.awardScoreForNodes(nodesToDestroy.map(node => {
+            const comp = node.getComponent(TileComponent);
+            return { node, r: comp.gridPos.y, c: comp.gridPos.x };
+        }), tileNode.getPosition());
+
+        const boosterData = this.model.getBoosterType(group);
         this.model.clearCells(group);
 
         let count = 0;
@@ -422,6 +418,7 @@ export default class GameController extends cc.Component {
 
         if (this.data.gameState === GameState.BOOSTER_BOMB) {
             this.handleBombClick(r, c);
+            this.data.useMove();
             return;
         }
         
@@ -451,25 +448,26 @@ export default class GameController extends cc.Component {
         }
     }
 
-    private restartLevel() {
+    private onRestart() {
         this.gridContainer.removeAllChildren();
         this.loadCurrentLevel();
-        this.isProcessing = false;
-    }
-
-    private onRestart() {
-        LevelManager.instance.restart();
     }
     private onNextLevel() {
         LevelManager.instance.nextLevel();
     }
 
     private checkPossibleMoves() {
-        if (!this.model.hasAvailableMoves(3)) {
+        if (this.data.score >= this.data.targetScore) {
+            return;
+        }
+
+        if (!this.model.hasAvailableMoves(this.config.economy.minMatch)) {
             if (this.data.useShuffle()) {
                 this.shuffleGrid();
             } else {
-                this.data.setGameState(GameState.LOST);
+                if (this.data.score < this.data.targetScore) {
+                    this.data.setGameState(GameState.LOST);
+                }
             }
         }
     }
@@ -528,7 +526,11 @@ export default class GameController extends cc.Component {
 
     private finalizePhysics() {
         this.isProcessing = false;
-        this.checkPossibleMoves();
+        if (this.data.score >= this.data.targetScore) {
+            this.data.setGameState(GameState.WIN);
+        } else {
+            this.checkPossibleMoves();
+        }
     }
 
     private getNodesByCoords(coords: { r: number, c: number }[]): cc.Node[] {
@@ -547,17 +549,8 @@ export default class GameController extends cc.Component {
             return comp.gridPos.y === r && comp.gridPos.x === c;
         });
     }
-
     private activateBooster(r: number, c: number, type: number) {
-        const pos = this.getScreenPosition(r, c);
-        EffectManager.instance.playExplosionEffects(this.gridContainer, pos, type);
-
-        if (type === 8) {
-            EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 2);
-        } else if (type === 9) {
-            EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 3);
-        }
-
+        this.data.useMove();
         const neighborBooster = this.findNeighborBooster(r, c);
 
         if (neighborBooster) {
@@ -619,35 +612,36 @@ export default class GameController extends cc.Component {
         this.isProcessing = true;
         let affected: { r: number, c: number }[] = [];
         const epicenter = {r: r1, c: c1};
-
-        const neighbor = this.findNeighborBooster(r1, c1);
-        if (!neighbor) {
-            this.finishExplosionWave();
-            return;
-        }
-
-        const r2 = neighbor.r;
-        const c2 = neighbor.c;
-
-        const isRocket1 = type1 === 6 || type1 === 7;
-        const isRocket2 = type2 === 6 || type2 === 7;
-        const isBomb = type1 === 8 || type2 === 8;
-
         const pos = this.getScreenPosition(r1, c1);
 
-        affected.push(epicenter);
-
-        affected.push({r: r2, c: c2});
-
-        if ((isRocket1 && isRocket2) || (isRocket1 && isBomb) || (isRocket2 && isBomb)) {
+        if ((type1 === 6 || type1 === 7) && (type2 === 6 || type2 === 7)) {
             EffectManager.instance.spawnCrossFX(this.gridContainer, pos);
-            if (isBomb) EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 3);
-
             for (let i = 0; i < this._currentCols; i++) affected.push({r: r1, c: i});
             for (let i = 0; i < this._currentRows; i++) affected.push({r: i, c: c1});
             affected = this.removeDuplicates(affected);
-        } else if (type1 === 8 || type2 === 8 || type1 === 9 || type2 === 9) {
-            EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 3);
+        }
+        else if ((type1 === 8 || type1 === 9) && (type2 === 8 || type2 === 9)) {
+            EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, EffectTypes.BOMB);
+            const radius = this.config.boosters.bombRadius + 1;
+            for (let i = r1 - radius; i <= r1 + radius; i++) {
+                for (let j = c1 - radius; j <= c1 + radius; j++) {
+                    if (i >= 0 && i < this._currentRows && j >= 0 && j < this._currentCols) {
+                        affected.push({r: i, c: j});
+                    }
+                }
+            }
+            affected = this.removeDuplicates(affected);
+        }
+        else if ((type1 === 6 || type1 === 7) || (type2 === 6 || type2 === 7)) {
+            const rocketType = (type1 === 6 || type2 === 6) ? 6 : 7;
+            EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, 2);
+
+            if (rocketType === 6) {
+                for (let i = 0; i < this._currentCols; i++) affected.push({r: r1, c: i});
+            } else {
+                for (let i = 0; i < this._currentRows; i++) affected.push({r: i, c: c1});
+            }
+
             const radius = this.config.boosters.bombRadius;
             for (let i = r1 - radius; i <= r1 + radius; i++) {
                 for (let j = c1 - radius; j <= c1 + radius; j++) {
@@ -658,8 +652,20 @@ export default class GameController extends cc.Component {
             }
             affected = this.removeDuplicates(affected);
         }
+        else {
+            affected.push(epicenter);
+        }
+        let fxType = EffectTypes.BOMB;
+        if ((type1 === 6 || type1 === 7) && (type2 === 6 || type2 === 7)) {
+            fxType = EffectTypes.ROCKET_VERTICAL; 
+            EffectManager.instance.spawnCrossFX(this.gridContainer, this.getScreenPosition(r1, c1));
+        } else if ((type1 === 8 || type1 === 9) && (type2 === 8 || type2 === 9)) {
+            fxType = EffectTypes.MEGA;
+        } else {
+            fxType = EffectTypes.BOMB;
+        }
 
-        this.executeExplosion(affected, epicenter);
+        this.executeExplosion(affected, {r: r1, c: c1}, fxType);
     }
 
     private removeDuplicates(coords: { r: number; c: number }[]): { r: number; c: number }[] {
@@ -672,13 +678,17 @@ export default class GameController extends cc.Component {
         });
     }
 
-    private async executeExplosion(coords: { r: number, c: number }[], epicenter?: { r: number, c: number }) {
+    private async executeExplosion(
+        coords: { r: number, c: number }[],
+        epicenter?: { r: number, c: number },
+        fxType: number = 0
+    ) {
         this._activeExplosionsCount++;
         EffectManager.instance.shakeCamera();
 
         if (epicenter) {
             this.sortCoordsByEpicenter(coords, epicenter);
-            this.removeEpicenterNode(epicenter);
+            this.removeEpicenterNode(epicenter, fxType);
         }
 
         const nodesToDestroy = this.getNodesByCoords(coords);
@@ -690,12 +700,29 @@ export default class GameController extends cc.Component {
         nodesToDestroy.forEach((node, index) => {
             const delay = index * this.config.animations.blastWaveDelay;
             this.scheduleOnce(() => {
-                this.processSingleNodeExplosion(node, epicenter);
+                this.processSingleNodeExplosion(node, epicenter, fxType);
                 if (index === nodesToDestroy.length - 1) {
                     this.finishExplosionWave();
                 }
             }, delay);
         });
+    }
+
+    private awardScoreForNodes(
+        nodes: Array<{ node: cc.Node; r: number; c: number }>,
+        pos: cc.Vec2
+    ) {
+        const worldPos = this.gridContainer.convertToWorldSpaceAR(pos);
+        const normalTiles = nodes.filter(n => {
+            const type = n.node.getComponent(TileComponent).type;
+            return type >= 2 && type <= 5;
+        });
+
+        if (normalTiles.length > 0) {
+            const points = normalTiles.length * this.config.economy.scoreTile;
+            this.data.addScore(points);
+            EffectManager.instance.showScoreAnimation(worldPos, points);
+        }
     }
 
     private sortCoordsByEpicenter(coords: { r: number, c: number }[], epi: { r: number, c: number }) {
@@ -706,20 +733,24 @@ export default class GameController extends cc.Component {
         });
     }
 
-    private removeEpicenterNode(epi: { r: number, c: number }) {
+    private removeEpicenterNode(epi: { r: number, c: number }, fxType: number) {
         const epiNode = this.getNodeAt(epi.r, epi.c);
         if (!epiNode) return;
 
         const type = epiNode.getComponent(TileComponent).type;
         const pos = this.getScreenPosition(epi.r, epi.c);
 
-        EffectManager.instance.playExplosionEffects(this.gridContainer, pos, type);
+        EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, fxType);
 
         this.model.clearCells([epi]);
         PoolManager.instance.putBooster(epiNode, type);
     }
 
-    private processSingleNodeExplosion(node: cc.Node, epicenter?: { r: number, c: number }) {
+    private processSingleNodeExplosion(
+        node: cc.Node,
+        epicenter?: { r: number, c: number },
+        fxTypeOverride?: number
+    ) {
         if (!cc.isValid(node)) return;
 
         const comp = node.getComponent(TileComponent);
@@ -727,7 +758,15 @@ export default class GameController extends cc.Component {
         const type = comp.type;
         const pos = this.getScreenPosition(r, c);
 
-        EffectManager.instance.playExplosionEffects(this.gridContainer, pos, type);
+        const isNotEpicenter = !epicenter || (r !== epicenter.r || c !== epicenter.c);
+        if (isNotEpicenter) {
+            let fxType = EffectTypes.TILE_NORMAL;
+            if (type === 6) fxType = EffectTypes.ROCKET_VERTICAL;
+            else if (type === 7) fxType = EffectTypes.ROCKET_HORIZONTAL;
+            else if (type === 8 || type === 9) fxType = EffectTypes.BOMB;
+
+            EffectManager.instance.spawnExplosionFX(this.gridContainer, pos, fxType);
+        }
 
         if (type >= 6 && type <= 9) {
             this.handleBoosterChainReaction(r, c, type, epicenter, node);
@@ -747,7 +786,7 @@ export default class GameController extends cc.Component {
         EffectManager.instance.showScoreAnimation(worldPos, points);
 
         node.getComponent(TileComponent).destroyTile(() => {
-            PoolManager.instance.putTile(node); // ✅ Только для обычных тайлов
+            PoolManager.instance.putTile(node);
         });
     }
 
@@ -773,15 +812,18 @@ export default class GameController extends cc.Component {
 
     private executeSingleBooster(r: number, c: number, type: number) {
         let affected: { r: number, c: number }[] = [];
+        let fxType = EffectTypes.TILE_NORMAL;
 
         switch (type) {
-            case 6:
+            case 6: // Vertical Rocket
                 for (let i = 0; i < this._currentCols; i++) affected.push({r, c: i});
+                fxType = EffectTypes.ROCKET_VERTICAL;
                 break;
-            case 7:
+            case 7: // Horizontal Rocket
                 for (let i = 0; i < this._currentRows; i++) affected.push({r: i, c});
+                fxType = EffectTypes.ROCKET_HORIZONTAL;
                 break;
-            case 8: 
+            case 8: // Bomb
                 const radius = this.config.boosters.bombRadius;
                 for (let i = r - radius; i <= r + radius; i++) {
                     for (let j = c - radius; j <= c + radius; j++) {
@@ -790,14 +832,16 @@ export default class GameController extends cc.Component {
                         }
                     }
                 }
+                fxType = EffectTypes.BOMB;
                 break;
-            case 9:
+            case 9: // Mega
                 for (let i = 0; i < this._currentRows; i++) {
                     for (let j = 0; j < this._currentCols; j++) affected.push({r: i, c: j});
                 }
+                fxType = EffectTypes.BOMB;
                 break;
         }
 
-        this.executeExplosion(affected, {r, c});
+        this.executeExplosion(affected, {r, c}, fxType);
     }
 }

@@ -11,7 +11,7 @@ export default class WinWindow extends cc.Component {
 
     onLoad() {
         DataService.instance.eventTarget.on(DataService.EVT_STATE_CHANGED, (state: GameState) => {
-            if (state === GameState.WON) {
+            if (state === GameState.WIN) {
                 this.show()
                 AudioManager.instance.play("win");
             }

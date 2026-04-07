@@ -130,7 +130,7 @@ export default class DataService {
 
     private checkWinCondition() {
         if (this._score >= this._targetScore && this._gameState === GameState.PLAYING) {
-            this.setGameState(GameState.WON);
+            this.setGameState(GameState.WIN);
         }
     }
 

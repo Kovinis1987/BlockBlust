@@ -1,6 +1,6 @@
 ﻿export enum GameState {
     PLAYING,
-    WON,
+    WIN,
     LOST,
     SHUFFLING,
     BOOSTER_TELEPORT,

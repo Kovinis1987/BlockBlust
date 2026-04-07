@@ -35,17 +35,6 @@ export default class LevelManager {
         });
     }
 
-    public restart() {
-        const currentLevel = DataService.instance.currentLevel;
-        this.loadLevel(currentLevel, (levelData) => {
-            DataService.instance.resetLevel(
-                currentLevel,
-                levelData.moves ?? 25,
-                levelData.targetScore ?? 1500
-            );
-        });
-    }
-
     public nextLevel() {
         const nextLevel = DataService.instance.currentLevel + 1;
         this.loadLevel(nextLevel, (levelData) => {
