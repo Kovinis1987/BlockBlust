@@ -35,14 +35,15 @@ export default class LevelManager {
         });
     }
 
-    public nextLevel() {
+    public nextLevel(onComplete?: (data: LevelData) => void) {
         const nextLevel = DataService.instance.currentLevel + 1;
+        DataService.instance.currentLevel = nextLevel; // ✅ Увеличиваем уровень
+
         this.loadLevel(nextLevel, (levelData) => {
-            DataService.instance.resetLevel(
-                nextLevel,
-                levelData.moves ?? 25,
-                levelData.targetScore ?? 1500
-            );
+            // ✅ Можно сбросить уровень здесь, но лучше в GameController
+            if (onComplete) {
+                onComplete(levelData);
+            }
         });
     }
 }

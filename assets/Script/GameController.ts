@@ -51,7 +51,6 @@ export default class GameController extends cc.Component {
         this.data = DataService.instance;
 
         this.data.eventTarget.on(DataService.EVT_CONTINUE, this.handleContinue, this);
-        this.data.eventTarget.on(DataService.EVT_NEXT_LEVEL, this.onNextLevel, this);
         this.boosterButtonTeleport.node.on(DataService.EVT_BOOSTER_TELEPORT, this.onTeleportModeToggle, this);
         this.boosterButtonBomb.node.on(DataService.EVT_BOOSTER_BOMB, this.onBombModeToggle, this);
         this.data.eventTarget.on(DataService.EVT_RESTART, this.onRestart, this);
@@ -451,8 +450,34 @@ export default class GameController extends cc.Component {
         this.gridContainer.removeAllChildren();
         this.loadCurrentLevel();
     }
+
+    private reloadLevel() {
+        this.isProcessing = true;
+        this.gridContainer.removeAllChildren();
+
+        LevelManager.instance.loadLevel(this.data.currentLevel, (levelData) => {
+            this.setupGame(levelData.rows, levelData.cols, levelData.tiles);
+            this.isProcessing = false;
+            this.checkPossibleMoves();
+        });
+    }
+    
     private onNextLevel() {
-        LevelManager.instance.nextLevel();
+        this.isProcessing = true;
+        this.gridContainer.removeAllChildren();
+
+        LevelManager.instance.nextLevel((levelData) => {
+            this.setupGame(levelData.rows, levelData.cols, levelData.tiles);
+
+            this.data.resetLevel(
+                DataService.instance.currentLevel,
+                levelData.moves ?? 25,
+                levelData.targetScore ?? 1500
+            );
+
+            this.isProcessing = false;
+            this.checkPossibleMoves();
+        });
     }
 
     private checkPossibleMoves() {
