@@ -23,9 +23,6 @@ export default class GameController extends cc.Component {
     @property(BoosterBombButton)
     boosterButtonBomb: BoosterBombButton = null;
 
-    @property(cc.Integer)
-    currentLevel: number = 0;
-
     @property(cc.Prefab)
     scorePopupPrefab: cc.Prefab = null;
 
@@ -49,7 +46,7 @@ export default class GameController extends cc.Component {
 
     private data: DataService;
 
-    onLoad() {
+    public onLoad() {
         this.data = DataService.instance;
 
         this.data.eventTarget.on(DataService.EVT_RESTART, this.restartLevel, this);
@@ -57,16 +54,19 @@ export default class GameController extends cc.Component {
         this.data.eventTarget.on(DataService.EVT_NEXT_LEVEL, this.onNextLevel, this);
         this.boosterButtonTeleport.node.on(DataService.EVT_BOOSTER_TELEPORT, this.onTeleportModeToggle, this);
         this.boosterButtonBomb.node.on(DataService.EVT_BOOSTER_BOMB, this.onBombModeToggle, this);
+        this.data.eventTarget.on(DataService.EVT_RESTART, this.onRestart, this);
+        this.data.eventTarget.on(DataService.EVT_NEXT_LEVEL, this.onNextLevel, this);
+
 
         this.loadCurrentLevel();
     }
 
     private loadCurrentLevel() {
         this.isProcessing = true;
-        LevelManager.instance.loadLevel(this.currentLevel, (levelData) => {
+        LevelManager.instance.loadLevel(this.data.currentLevel, (levelData) => {
             this.setupGame(levelData.rows, levelData.cols, levelData.tiles);
             this.data.resetLevel(
-                this.currentLevel,
+                this.data.currentLevel,
                 levelData.moves ?? 25,
                 levelData.targetScore ?? 1500
             );
@@ -457,9 +457,11 @@ export default class GameController extends cc.Component {
         this.isProcessing = false;
     }
 
+    private onRestart() {
+        LevelManager.instance.restart();
+    }
     private onNextLevel() {
-        this.currentLevel++;
-        this.loadCurrentLevel();
+        LevelManager.instance.nextLevel();
     }
 
     private checkPossibleMoves() {

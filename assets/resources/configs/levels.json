@@ -2,7 +2,7 @@
   "0": {
     "rows": 9,
     "cols": 9,
-    "moves": 25,
+    "moves": 5,
     "targetScore": 1500,
     "tiles": [
       0,

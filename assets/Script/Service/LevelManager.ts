@@ -1,4 +1,5 @@
 ﻿import {LevelData} from "../Interface/LevelData";
+import DataService from "./DataService";
 
 export default class LevelManager {
     private static _instance: LevelManager;
@@ -31,6 +32,28 @@ export default class LevelManager {
             if (onComplete) {
                 onComplete(data);
             }
+        });
+    }
+
+    public restart() {
+        const currentLevel = DataService.instance.currentLevel;
+        this.loadLevel(currentLevel, (levelData) => {
+            DataService.instance.resetLevel(
+                currentLevel,
+                levelData.moves ?? 25,
+                levelData.targetScore ?? 1500
+            );
+        });
+    }
+
+    public nextLevel() {
+        const nextLevel = DataService.instance.currentLevel + 1;
+        this.loadLevel(nextLevel, (levelData) => {
+            DataService.instance.resetLevel(
+                nextLevel,
+                levelData.moves ?? 25,
+                levelData.targetScore ?? 1500
+            );
         });
     }
 }

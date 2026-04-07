@@ -73,6 +73,20 @@ export default class DataService {
         this.eventTarget.emit('state-changed', this._gameState);
     }
 
+    public restartCurrentLevel() {
+        this.eventTarget.emit(DataService.EVT_RESTART);
+    }
+
+    public goToNextLevel() {
+        this._currentLevel++;
+        this.eventTarget.emit(DataService.EVT_NEXT_LEVEL);
+    }
+
+    public loadLevel(levelIndex: number) {
+        this._currentLevel = levelIndex;
+        this.eventTarget.emit(DataService.EVT_NEXT_LEVEL);
+    }
+
     public addScore(amount: number) {
         this._score += amount;
         this.eventTarget.emit('score-changed', this._score);
