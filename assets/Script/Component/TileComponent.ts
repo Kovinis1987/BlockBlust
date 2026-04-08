@@ -1,3 +1,5 @@
+import {TileType} from "../Enum/TileType";
+
 const { ccclass, property } = cc._decorator;
 
 @ccclass
@@ -9,11 +11,11 @@ export default class TileComponent extends cc.Component {
     @property([cc.SpriteFrame])
     colors: cc.SpriteFrame[] = [];
 
-    private _type: number = -1;
+    private _type: TileType = TileType.EMPTY;
     private _gridPos: cc.Vec2 = cc.v2(0, 0);
     private _clickHandler: Function = null;
 
-    get type(): number { return this._type; }
+    get type(): TileType { return this._type; }
     get gridPos(): cc.Vec2 { return this._gridPos; }
     set gridPos(value: cc.Vec2) {
         this._gridPos = value;

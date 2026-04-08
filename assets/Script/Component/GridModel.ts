@@ -1,4 +1,5 @@
 import GameConfig from "../Config/GameConfig";
+import {BOOSTER_TYPES, COLOR_TILES, TileType} from "../Enum/TileType";
 
 export default class GridModel {
     private grid: number[][] = [];
@@ -14,26 +15,24 @@ export default class GridModel {
     }
 
     private initEmptyGrid() {
-        this.grid = [];
-        for (let r = 0; r < this.rows; r++) {
-            this.grid[r] = [];
-            for (let c = 0; c < this.cols; c++) {
-                this.grid[r][c] = -1;
-            }
+        this.grid = Array(this.rows).fill(null).map(() =>
+            Array(this.cols).fill(TileType.EMPTY)
+        );
+    }
+
+    public setTile(r: number, c: number, type: TileType) {
+        if (this.isValid(r, c)) {
+            this.grid[r][c] = type;
         }
     }
 
-    public setTile(r: number, c: number, type: number) {
-        this.grid[r][c] = type;
-    }
-
-    public getTile(r: number, c: number): number {
-        return this.grid[r][c];
+    public getTile(r: number, c: number): TileType {
+        return this.isValid(r, c) ? this.grid[r][c] : TileType.EMPTY;
     }
 
     public findGroup(row: number, col: number): { r: number, c: number }[] {
         const targetColor = this.grid[row][col];
-        if (targetColor === -1 || targetColor === 1) return [];
+        if (targetColor === TileType.EMPTY || targetColor === TileType.OBSTACLE) return [];
 
         const group: { r: number, c: number }[] = [];
         const queue: { r: number, c: number }[] = [{ r: row, c: col }];
@@ -61,46 +60,46 @@ export default class GridModel {
         return group;
     }
 
-    public clearCells(group: { r: number, c: number }[]) {
-        group.forEach(cell => {
-            if (this.grid[cell.r][cell.c] > 1) { 
-                this.grid[cell.r][cell.c] = -1;
+    public clearCells(group: { r: number, c: number }[] = []) {
+        for (const cell of group) {
+            if (this.isValid(cell.r, cell.c)) {
+                const type = this.grid[cell.r][cell.c];
+                if (type !== TileType.OBSTACLE && type > 1) {
+                    this.grid[cell.r][cell.c] = TileType.EMPTY;
+                }
             }
-        });
+        }
     }
 
     public processFalling(): { from: { r: number, c: number }, to: { r: number, c: number } }[] {
-        const movements = [];
+        const movements: { from: { r: number, c: number }, to: { r: number, c: number } }[] = [];
         let moved = true;
 
         while (moved) {
             moved = false;
             for (let r = 0; r < this.rows; r++) {
                 for (let c = 0; c < this.cols; c++) {
-                    if (this.grid[r][c] !== -1) continue;
+                    if (this.grid[r][c] !== TileType.EMPTY) continue;
 
                     let foundVertical = false;
                     for (let nextR = r + 1; nextR < this.rows; nextR++) {
                         const tileAbove = this.grid[nextR][c];
-
-                        if (tileAbove === 1) break; 
-
-                        if (tileAbove > 1) { 
+                        if (tileAbove === TileType.OBSTACLE) break;
+                        if (COLOR_TILES.includes(tileAbove) || BOOSTER_TYPES.includes(tileAbove)) {
                             this.moveTile(nextR, c, r, c, movements);
                             moved = true;
                             foundVertical = true;
                             break;
                         }
                     }
-
                     if (foundVertical) continue;
 
-                    if (r + 1 < this.rows && this.grid[r + 1][c] === 1) {
-                        for (let step of [-1, 1]) {
+                    if (r + 1 < this.rows && this.grid[r + 1][c] === TileType.OBSTACLE) {
+                        for (const step of [-1, 1]) {
                             const sideCol = c + step;
                             if (sideCol >= 0 && sideCol < this.cols) {
                                 const sideTile = this.grid[r + 1][sideCol];
-                                if (sideTile > 1) {
+                                if (COLOR_TILES.includes(sideTile) || BOOSTER_TYPES.includes(sideTile)) {
                                     this.moveTile(r + 1, sideCol, r, c, movements);
                                     moved = true;
                                     break;
@@ -115,19 +114,19 @@ export default class GridModel {
     }
 
     private moveTile(fromR: number, fromC: number, toR: number, toC: number, movements: any[]) {
-        if (this.grid[fromR][fromC] === 1 || this.grid[toR][toC] === 1) return;
-
+        if (this.grid[fromR][fromC] === TileType.OBSTACLE || this.grid[toR][toC] === TileType.OBSTACLE) return;
         this.grid[toR][toC] = this.grid[fromR][fromC];
-        this.grid[fromR][fromC] = -1;
+        this.grid[fromR][fromC] = TileType.EMPTY;
         movements.push({ from: { r: fromR, c: fromC }, to: { r: toR, c: toC } });
     }
 
-    public fillEmptyCells(): { r: number; c: number; type: number }[] {
-        const newTiles: { r: number; c: number; type: number }[] = [];
+    public fillEmptyCells(): { r: number; c: number; type: TileType }[] {
+        const newTiles: { r: number; c: number; type: TileType }[] = [];
         for (let c = 0; c < this.cols; c++) {
             for (let r = this.rows - 1; r >= 0; r--) {
-                if (this.grid[r][c] === -1) {
-                    const colorID = Math.floor(Math.random() * 4) + 2;
+                if (this.grid[r][c] === TileType.EMPTY) {
+                    const colors = [TileType.RED, TileType.GREEN, TileType.BLUE, TileType.YELLOW];
+                    const colorID = colors[Math.floor(Math.random() * colors.length)];
                     this.grid[r][c] = colorID;
                     newTiles.push({ r, c, type: colorID });
                 }
@@ -140,18 +139,18 @@ export default class GridModel {
         for (let r = 0; r < this.rows; r++) {
             for (let c = 0; c < this.cols; c++) {
                 const type = this.grid[r][c];
-                if (type >= 6 && type <= 10) return true;
-                if (type >= 2 && this.findGroup(r, c).length >= minGroup) return true;
+                if (BOOSTER_TYPES.includes(type)) return true;
+                if (COLOR_TILES.includes(type) && this.findGroup(r, c).length >= minGroup) return true;
             }
         }
         return false;
     }
 
     public shuffleOnlyColors() {
-        let colors: number[] = [];
+        const colors: TileType[] = [];
         for (let r = 0; r < this.rows; r++) {
             for (let c = 0; c < this.cols; c++) {
-                if (this.grid[r][c] >= 2 && this.grid[r][c] <= 5) {
+                if (COLOR_TILES.includes(this.grid[r][c])) {
                     colors.push(this.grid[r][c]);
                 }
             }
@@ -165,14 +164,14 @@ export default class GridModel {
         let idx = 0;
         for (let r = 0; r < this.rows; r++) {
             for (let c = 0; c < this.cols; c++) {
-                if (this.grid[r][c] >= 2 && this.grid[r][c] <= 5) {
+                if (COLOR_TILES.includes(this.grid[r][c])) {
                     this.grid[r][c] = colors[idx++];
                 }
             }
         }
     }
 
-    public getBoosterType(group: { r: number, c: number }[]): { type: number, orientation?: 'h' | 'v' } | null {
+    public getBoosterType(group: { r: number, c: number }[]): { type: TileType, orientation?: 'h' | 'v' } | null {
         const count = group.length;
         const { rocketMin, bombMin, megaMin } = this.config.economy;
 
@@ -180,7 +179,6 @@ export default class GridModel {
 
         let minR = group[0].r, maxR = group[0].r;
         let minC = group[0].c, maxC = group[0].c;
-
         for (const cell of group) {
             minR = Math.min(minR, cell.r);
             maxR = Math.max(maxR, cell.r);
@@ -191,24 +189,35 @@ export default class GridModel {
         const height = maxR - minR + 1;
         const width = maxC - minC + 1;
 
-        let type: number;
-        let orientation: 'h' | 'v' | undefined;
-
+        let type: TileType;
         if (count >= megaMin) {
-            type = 9;
+            type = TileType.MEGA;
         } else if (count >= bombMin) {
-            type = 8;
-        } else if (count >= rocketMin) {
-            if (height > width) {
-                type = 7;
-                orientation = 'v';
-            } else {
-                type = 6;
-                orientation = 'h';
-            }
+            type = TileType.BOMB;
+        } else {
+            type = height > width ? TileType.ROCKET_HORIZONTAL : TileType.ROCKET_VERTICAL;
         }
 
-        return { type, orientation };
+        return { type };
+    }
+
+    public isColorTile(type: TileType): boolean {
+        return COLOR_TILES.includes(type);
+    }
+
+    public isBooster(type: TileType): boolean {
+        return BOOSTER_TYPES.includes(type);
+    }
+
+    public isEmpty(r: number, c: number): boolean {
+        return this.getTile(r, c) === TileType.EMPTY;
+    }
+
+    public isObstacle(r: number, c: number): boolean {
+        return this.getTile(r, c) === TileType.OBSTACLE;
+    }
+    private isValid(r: number, c: number): boolean {
+        return r >= 0 && r < this.rows && c >= 0 && c < this.cols;
     }
     
     
