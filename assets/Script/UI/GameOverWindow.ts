@@ -7,7 +7,8 @@ import AudioManager from "../Service/AudioManager";
 @ccclass
 export default class GameOverWindow extends cc.Component {
     @property(cc.Label) scoreLabel: cc.Label = null;
-    @property(cc.Node) panel: cc.Node = null; // Сама панель окна
+    @property(cc.Node) panel: cc.Node = null;
+    @property(cc.Node) background: cc.Node = null;
 
     onLoad() {
         DataService.instance.eventTarget.on(DataService.EVT_STATE_CHANGED, (state: GameState) => {
@@ -19,6 +20,7 @@ export default class GameOverWindow extends cc.Component {
 
     show() {
         this.panel.active = true;
+        this.background.active = true;
         this.scoreLabel.string = `Очки: ${DataService.instance.score}`;
         AudioManager.instance.play("fall");
         this.panel.scale = 0.5;

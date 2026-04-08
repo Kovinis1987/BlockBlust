@@ -49,14 +49,17 @@ export default class EffectManager {
         switch (fxType) {
             case EffectTypes.ROCKET_VERTICAL:
             case EffectTypes.ROCKET_HORIZONTAL:
-                AudioManager.instance.play('blast');
+                AudioManager.instance.playBlastSpam();
                 break;
             case EffectTypes.BOMB:
             case EffectTypes.MEGA:
                 AudioManager.instance.play('booster');
                 break;
+            case EffectTypes.TILE_NORMAL:
+                AudioManager.instance.play('tileExp');
+                break;
             default:
-                AudioManager.instance.play('explosion');
+                AudioManager.instance.play('tileExp');
                 break;
         }
     }
@@ -74,6 +77,10 @@ export default class EffectManager {
             .by(0.05, { x: 10, y: 10 })
             .by(0.05, { x: -20, y: -10 })
             .by(0.05, { x: 10, y: 0 })
+            .call(() => {
+                mainCamera.y = 0;
+                mainCamera.x = 0;
+            })
             .start();
     }
 

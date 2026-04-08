@@ -7,7 +7,8 @@ import AudioManager from "../Service/AudioManager";
 @ccclass
 export default class WinWindow extends cc.Component {
     @property(cc.Label) scoreLabel: cc.Label = null;
-    @property(cc.Node) panel: cc.Node = null; // Сама панель окна
+    @property(cc.Node) panel: cc.Node = null;
+    @property(cc.Node) background: cc.Node = null;
 
     onLoad() {
         DataService.instance.eventTarget.on(DataService.EVT_STATE_CHANGED, (state: GameState) => {
@@ -23,6 +24,7 @@ export default class WinWindow extends cc.Component {
 
     private show() {
         this.panel.active = true;
+        his.background.active = true;
         this.scoreLabel.string = `Очки: ${DataService.instance.score}`;
 
         this.panel.scale = 0.5;
@@ -41,6 +43,9 @@ export default class WinWindow extends cc.Component {
                 this.panel.active = false;
                 this.panel.opacity = 255;
                 DataService.instance.eventTarget.emit(DataService.EVT_NEXT_LEVEL);
+                if (this.background) {
+                    this.background.active = false;
+                }
             })
             .start();
     }

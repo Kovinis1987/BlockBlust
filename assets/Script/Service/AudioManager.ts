@@ -9,6 +9,7 @@ export default class AudioManager extends cc.Component {
     @property({ type: cc.AudioClip }) clickSfx: cc.AudioClip = null;
     @property({ type: cc.AudioClip }) blastSfx: cc.AudioClip = null;
     @property({ type: cc.AudioClip }) boosterSfx: cc.AudioClip = null;
+    @property({ type: cc.AudioClip }) tileBlastSfx: cc.AudioClip = null;
     @property({ type: cc.AudioClip }) fallSfx: cc.AudioClip = null;
     @property({ type: cc.AudioClip }) winSfx: cc.AudioClip = null;
     @property({ type: cc.AudioClip }) switchBooster: cc.AudioClip = null;
@@ -38,6 +39,7 @@ export default class AudioManager extends cc.Component {
         switch(effectName) {
             case 'blast': this.playSFX(this.blastSfx); break;
             case 'booster': this.playSFX(this.boosterSfx); break;
+            case 'tileExp': this.playSFX(this.tileBlastSfx); break;
             case 'click': this.playSFX(this.clickSfx); break;
             case 'fall': this.playSFX(this.fallSfx, 0.5); break;
             case 'win': this.playSFX(this.winSfx); break;
