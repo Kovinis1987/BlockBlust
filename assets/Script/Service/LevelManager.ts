@@ -1,49 +1,63 @@
-﻿import {LevelData} from "../Interface/LevelData";
+import {LevelData} from "../Interface/LevelData";
 import DataService from "./DataService";
 
+export interface LoadedLevelData extends LevelData {
+    levelIndex: number;
+}
+
 export default class LevelManager {
-    private static _instance: LevelManager;
-    public static get instance(): LevelManager {
-        if (!this._instance) this._instance = new LevelManager();
-        return this._instance;
+    private static readonly DEFAULT_LEVEL: LevelData = {
+        rows: 9,
+        cols: 9,
+        moves: 25,
+        targetScore: 1500,
+        tiles: null,
+    };
+
+    constructor(private dataService: DataService) {
     }
 
-    loadLevel(levelIndex: number, onComplete?: (data: LevelData) => void) {
-        cc.resources.load('configs/levels', cc.JsonAsset, (err, res: cc.JsonAsset) => {
+    public loadCurrentLevel(onComplete?: (data: LoadedLevelData) => void) {
+        this.loadLevelByIndex(this.dataService.currentLevel, onComplete);
+    }
+
+    public reloadCurrentLevel(onComplete?: (data: LoadedLevelData) => void) {
+        this.loadCurrentLevel(onComplete);
+    }
+
+    private loadLevelByIndex(levelIndex: number, onComplete?: (data: LoadedLevelData) => void) {
+        cc.resources.load("configs/levels", cc.JsonAsset, (err, res: cc.JsonAsset) => {
             if (err) {
-                console.error("Ошибка загрузки levels.json:", err);
+                console.error("Failed to load levels.json:", err);
+                onComplete?.(this.toLoadedLevelData(levelIndex, null));
                 return;
             }
 
-            let data;
-            if (!res.json || !res.json[levelIndex]) {
-                cc.warn("Уровень не найден. Используем дефолт...");
-                data = {
-                    rows: 9,
-                    cols: 9,
-                    moves: 25,
-                    targetScore: 1500,
-                    tiles: null
-                };
-            } else {
-                data = res.json[levelIndex];
+            const rawLevel = res.json ? res.json[levelIndex] : null;
+            if (!rawLevel) {
+                cc.warn("Level not found. Using default level config.");
             }
 
-            if (onComplete) {
-                onComplete(data);
-            }
+            onComplete?.(this.toLoadedLevelData(levelIndex, rawLevel));
         });
     }
 
-    public nextLevel(onComplete?: (data: LevelData) => void) {
-        const nextLevel = DataService.instance.currentLevel + 1;
-        DataService.instance.currentLevel = nextLevel; // ✅ Увеличиваем уровень
+    private toLoadedLevelData(levelIndex: number, rawLevel: any): LoadedLevelData {
+        const normalized: LevelData = rawLevel ? {
+            rows: rawLevel.rows ?? LevelManager.DEFAULT_LEVEL.rows,
+            cols: rawLevel.cols ?? LevelManager.DEFAULT_LEVEL.cols,
+            moves: rawLevel.moves ?? LevelManager.DEFAULT_LEVEL.moves,
+            targetScore: rawLevel.targetScore ?? LevelManager.DEFAULT_LEVEL.targetScore,
+            tiles: rawLevel.tiles ?? LevelManager.DEFAULT_LEVEL.tiles,
+        } : LevelManager.DEFAULT_LEVEL;
 
-        this.loadLevel(nextLevel, (levelData) => {
-            // ✅ Можно сбросить уровень здесь, но лучше в GameController
-            if (onComplete) {
-                onComplete(levelData);
-            }
-        });
+        return {
+            levelIndex,
+            rows: normalized.rows,
+            cols: normalized.cols,
+            moves: normalized.moves,
+            targetScore: normalized.targetScore,
+            tiles: normalized.tiles,
+        };
     }
 }

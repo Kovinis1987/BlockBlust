@@ -16,6 +16,11 @@ export default class DataService {
     public static readonly EVT_BOOSTER_TELEPORT = 'booster-teleport-toggle';
     public static readonly EVT_BOOSTER_BOMB = 'booster-bomb-toggle';
     public static readonly EVT_STATE_CHANGED = 'state-changed';
+    public static readonly EVT_SCORE_CHANGED = 'score-changed';
+    public static readonly EVT_MOVES_CHANGED = 'moves-changed';
+    public static readonly EVT_SHUFFLE_CHANGED = 'shuffle-changed';
+    public static readonly EVT_TELEPORT_CHANGED = 'teleport-changed';
+    public static readonly EVT_BOMB_CHANGED = 'bomb-changed';
 
     private _score: number = 0;
     private _moves: number = 25;
@@ -24,10 +29,6 @@ export default class DataService {
 
     private _targetScore: number = 1000;
     private _currentLevel: number = 0;
-    private _rows: number = 8;
-    private _cols: number = 8;
-    private _tilesData: number[] | null = null;
-
     private _teleportBoosters: number = 5;
     private _bombBoosters: number = 5;
 
@@ -37,17 +38,16 @@ export default class DataService {
     get targetScore() { return this._targetScore; }
     get currentLevel() { return this._currentLevel; }
     set currentLevel(value: number) { this._currentLevel = value; }
-    get rows() { return this._rows; }
-    get cols() { return this._cols; }
     get teleportBoosters(): number { return this._teleportBoosters; }
     set teleportBoosters(value: number) {
         this._teleportBoosters = Math.max(0, value);
-        this.eventTarget.emit('teleport-changed', this._teleportBoosters);
+        this.eventTarget.emit(DataService.EVT_TELEPORT_CHANGED, this._teleportBoosters);
     }
 
     get bombBoosters(): number { return this._bombBoosters; }
     private set bombBoosters(value: number) {
-        this._bombBoosters = value;
+        this._bombBoosters = Math.max(0, value);
+        this.eventTarget.emit(DataService.EVT_BOMB_CHANGED, this._bombBoosters);
     }
 
     public resetLevel(level: number, moves: number, target: number) {
@@ -57,11 +57,12 @@ export default class DataService {
         this._score = 0;
         this._shuffleAttempts = 3;
         this._gameState = GameState.PLAYING;
-        this.eventTarget.emit('teleport-changed', this._teleportBoosters);
-        this.eventTarget.emit('score-changed', this._score);
-        this.eventTarget.emit('moves-changed', this._moves);
-        this.eventTarget.emit('shuffle-changed', this._shuffleAttempts);
-        this.eventTarget.emit('state-changed', this._gameState);
+        this.eventTarget.emit(DataService.EVT_TELEPORT_CHANGED, this._teleportBoosters);
+        this.eventTarget.emit(DataService.EVT_BOMB_CHANGED, this._bombBoosters);
+        this.eventTarget.emit(DataService.EVT_SCORE_CHANGED, this._score);
+        this.eventTarget.emit(DataService.EVT_MOVES_CHANGED, this._moves);
+        this.eventTarget.emit(DataService.EVT_SHUFFLE_CHANGED, this._shuffleAttempts);
+        this.eventTarget.emit(DataService.EVT_STATE_CHANGED, this._gameState);
         this.eventTarget.emit(DataService.EVT_LEVEL_LOADED, level);
     }
 
@@ -69,12 +70,16 @@ export default class DataService {
         this._moves += extraMoves;
         this._gameState = GameState.PLAYING;
 
-        this.eventTarget.emit('moves-changed', this._moves);
-        this.eventTarget.emit('state-changed', this._gameState);
+        this.eventTarget.emit(DataService.EVT_MOVES_CHANGED, this._moves);
+        this.eventTarget.emit(DataService.EVT_STATE_CHANGED, this._gameState);
     }
 
     public restartCurrentLevel() {
         this.eventTarget.emit(DataService.EVT_RESTART);
+    }
+
+    public requestContinue() {
+        this.eventTarget.emit(DataService.EVT_CONTINUE);
     }
 
     public goToNextLevel() {
@@ -82,28 +87,22 @@ export default class DataService {
         this.eventTarget.emit(DataService.EVT_NEXT_LEVEL);
     }
 
-    public loadLevel(levelIndex: number) {
-        this._currentLevel = levelIndex;
-        this.eventTarget.emit(DataService.EVT_NEXT_LEVEL);
-    }
-
     public addScore(amount: number) {
         this._score += amount;
-        this.eventTarget.emit('score-changed', this._score);
+        this.eventTarget.emit(DataService.EVT_SCORE_CHANGED, this._score);
     }
 
     public useMove() {
         if (this._moves > 0) {
             this._moves--;
-            this.eventTarget.emit('moves-changed', this._moves);
-            if (this._moves <= 0) this.checkLoseCondition();
+            this.eventTarget.emit(DataService.EVT_MOVES_CHANGED, this._moves);
         }
     }
 
     public useShuffle(): boolean {
         if (this._shuffleAttempts > 0) {
             this._shuffleAttempts--;
-            this.eventTarget.emit('shuffle-changed', this._shuffleAttempts);
+            this.eventTarget.emit(DataService.EVT_SHUFFLE_CHANGED, this._shuffleAttempts);
             return true;
         }
         return false;
@@ -112,19 +111,23 @@ export default class DataService {
     public useBombBooster(): boolean {
         if (this.bombBoosters > 0) {
             this.bombBoosters--;
-            // this.eventTarget.emit('bomb-changed', this.bombBoosters);
+            return true;
+        }
+        return false;
+    }
+
+    public useTeleportBooster(): boolean {
+        if (this.teleportBoosters > 0) {
+            this.teleportBoosters--;
             return true;
         }
         return false;
     }
 
     public setGameState(state: GameState) {
+        if (this._gameState === state) return;
         this._gameState = state;
-        this.eventTarget.emit('state-changed', this._gameState);
-    }
-
-    public nextLevel() {
-        this._currentLevel++;
+        this.eventTarget.emit(DataService.EVT_STATE_CHANGED, this._gameState);
     }
 
     public checkWinCondition(): boolean {
@@ -135,9 +138,11 @@ export default class DataService {
         return false;
     }
 
-    private checkLoseCondition() {
-        if (this._score < this._targetScore && this._moves <= 0) {
+    public checkLoseCondition(): boolean {
+        if (this._score < this._targetScore && this._moves <= 0 && this._gameState === GameState.PLAYING) {
             this.setGameState(GameState.LOST);
+            return true;
         }
+        return false;
     }
 }

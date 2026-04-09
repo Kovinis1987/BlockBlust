@@ -1,4 +1,6 @@
 import TileComponent from "../Component/TileComponent";
+import {appContainer} from "../Core/DiContainer";
+import {SERVICE_TOKENS} from "../Core/ServiceTokens";
 
 const { ccclass, property } = cc._decorator;
 
@@ -29,6 +31,7 @@ export default class PoolManager extends cc.Component {
 
     onLoad() {
         PoolManager._instance = this;
+        appContainer.registerInstance(SERVICE_TOKENS.poolManager, this);
         this._tilePool = new cc.NodePool();
         this._scorePopupPool = new cc.NodePool();
 

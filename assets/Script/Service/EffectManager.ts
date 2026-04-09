@@ -1,6 +1,8 @@
 import PoolManager from "./PoolManager";
 import AudioManager from "./AudioManager";
 import EffectTypes from "../Enum/EffectTypes";
+import {appContainer} from "../Core/DiContainer";
+import {SERVICE_TOKENS} from "../Core/ServiceTokens";
 
 const { ccclass } = cc._decorator;
 
@@ -19,6 +21,10 @@ export default class EffectManager {
         [EffectTypes.BOMB]: 1.0,
         [EffectTypes.MEGA]: 1.2
     };
+
+    private get audioManager(): AudioManager {
+        return appContainer.resolve(SERVICE_TOKENS.audioManager);
+    }
 
     public spawnExplosionFX(container: cc.Node, pos: cc.Vec2, fxType: number) {
         const fx = PoolManager.instance.getEffect(Number(fxType));
@@ -49,17 +55,29 @@ export default class EffectManager {
         switch (fxType) {
             case EffectTypes.ROCKET_VERTICAL:
             case EffectTypes.ROCKET_HORIZONTAL:
-                AudioManager.instance.playBlastSpam();
+                this.audioManager.playBlastSpam();
                 break;
             case EffectTypes.BOMB:
             case EffectTypes.MEGA:
-                AudioManager.instance.play('booster');
+                this.audioManager.play('booster', {
+                    cooldownMs: 120,
+                    randomVolume: [0.85, 1.0],
+                    randomPitch: [0.94, 1.02],
+                });
                 break;
             case EffectTypes.TILE_NORMAL:
-                AudioManager.instance.play('tileExp');
+                this.audioManager.play('tileExp', {
+                    cooldownMs: 45,
+                    randomVolume: [0.7, 0.9],
+                    randomPitch: [0.98, 1.08],
+                });
                 break;
             default:
-                AudioManager.instance.play('tileExp');
+                this.audioManager.play('tileExp', {
+                    cooldownMs: 45,
+                    randomVolume: [0.7, 0.9],
+                    randomPitch: [0.98, 1.08],
+                });
                 break;
         }
     }

@@ -1,6 +1,9 @@
-﻿import DataService from "../Service/DataService";
+import DataService from "../Service/DataService";
+import {registerDefaultServices} from "../Core/registerDefaultServices";
+import {appContainer} from "../Core/DiContainer";
+import {SERVICE_TOKENS} from "../Core/ServiceTokens";
 
-const { ccclass, property } = cc._decorator;
+const {ccclass, property} = cc._decorator;
 
 @ccclass
 export default class ScoreUIController extends cc.Component {
@@ -10,12 +13,13 @@ export default class ScoreUIController extends cc.Component {
     @property(cc.Label)
     movesLabel: cc.Label = null;
 
-    private dataService : DataService;
+    private dataService: DataService;
 
     onLoad() {
-        this.dataService = DataService.instance;
-        this.dataService.eventTarget.on('score-changed', this.updateScore, this);
-        this.dataService.eventTarget.on('moves-changed', this.updateMoves, this);
+        registerDefaultServices();
+        this.dataService = appContainer.resolve(SERVICE_TOKENS.dataService);
+        this.dataService.eventTarget.on(DataService.EVT_SCORE_CHANGED, this.updateScore, this);
+        this.dataService.eventTarget.on(DataService.EVT_MOVES_CHANGED, this.updateMoves, this);
 
         this.updateScore(this.dataService.score);
         this.updateMoves(this.dataService.moves);
@@ -23,7 +27,7 @@ export default class ScoreUIController extends cc.Component {
 
     private updateScore(value: number) {
         if (this.scoreLabel) {
-            this.scoreLabel.string = `${value} / ${DataService.instance.targetScore}`;
+            this.scoreLabel.string = `${value} / ${this.dataService.targetScore}`;
             ScoreUIController.playBounce(this.scoreLabel.node);
         }
     }
@@ -37,13 +41,13 @@ export default class ScoreUIController extends cc.Component {
 
     private static playBounce(node: cc.Node) {
         cc.tween(node)
-            .to(0.05, { scale: 1.1 })
-            .to(0.1, { scale: 1.0 })
+            .to(0.05, {scale: 1.1})
+            .to(0.1, {scale: 1.0})
             .start();
     }
 
     onDestroy() {
-        this.dataService.eventTarget.off('score-changed', this.updateScore, this);
-        this.dataService.eventTarget.off('moves-changed', this.updateMoves, this);
+        this.dataService.eventTarget.off(DataService.EVT_SCORE_CHANGED, this.updateScore, this);
+        this.dataService.eventTarget.off(DataService.EVT_MOVES_CHANGED, this.updateMoves, this);
     }
 }
