@@ -1,10 +1,13 @@
 'use strict';
+
 module.exports = {
-  load () {},
-  unload () {},
+  load() {},
+
+  unload() {},
+
   messages: {
-    'open' () {
-      Editor.Panel.open('location-editor');
-    }
+    'level-editor:open'() {
+      Editor.Panel.open('level-editor');
+    },
   },
 };
