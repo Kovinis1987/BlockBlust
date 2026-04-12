@@ -231,7 +231,6 @@
   {
     "__type__": "EconomySettings",
     "scoreTile": 10,
-    "scoreBooster": 40,
     "rocketMin": 5,
     "bombMin": 7,
     "megaMin": 10,
@@ -240,7 +239,6 @@
   },
   {
     "__type__": "AnimationsSettings",
-    "fallDuration": 0.4,
     "blastWaveDelay": 0.02
   },
   {
@@ -414,9 +412,6 @@
     },
     "boosterButtonBomb": {
       "__id__": 65
-    },
-    "scorePopupPrefab": {
-      "__uuid__": "ceb79d17-da3a-4eab-81b6-cc737f434e55"
     },
     "obstaclePrefab": {
       "__uuid__": "8355f4ed-bf60-47d5-8bfe-5f4db4ddc40f"
@@ -741,7 +736,7 @@
       "array": [
         0,
         0,
-        683.7502101333313,
+        461.5831828963458,
         0,
         0,
         0,
@@ -2888,7 +2883,7 @@
     },
     "_contentSize": {
       "__type__": "cc.Size",
-      "width": 3000,
+      "width": 4000,
       "height": 3000
     },
     "_anchorPoint": {
@@ -4262,7 +4257,7 @@
     },
     "_contentSize": {
       "__type__": "cc.Size",
-      "width": 3000,
+      "width": 4000,
       "height": 3000
     },
     "_anchorPoint": {
