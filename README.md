@@ -95,7 +95,7 @@
 
 Сейчас в проекте:
 
-- `40` unit tests
+- `41` unit tests
 - coverage `88%+`
 - локальные `pre-commit` и `pre-push` проверки
 - CI на `GitHub Actions`
@@ -114,3 +114,7 @@ npm run check
 1. Открыть проект в `Cocos Creator 2.4.x`
 2. Запустить основную сцену в Preview или Simulator
 3. При необходимости открыть `Extension -> Level Editor`
+
+## Лицензия
+
+Проект распространяется под лицензией `MIT`.
