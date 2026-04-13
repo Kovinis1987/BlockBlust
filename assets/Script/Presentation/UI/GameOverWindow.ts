@@ -19,6 +19,7 @@ export default class GameOverWindow extends cc.Component {
     private gameStore: GameStore;
     private gameSessionService: GameSessionService;
     private audioManager: AudioManager;
+    private isTransitioning = false;
 
     onLoad() {
         registerDefaultServices();
@@ -29,6 +30,7 @@ export default class GameOverWindow extends cc.Component {
 
         this.gameSignals.on(GameSignals.EVT_STATE_CHANGED, this.onStateChanged, this);
         this.panel.active = false;
+        this.setButtonsInteractable(false);
     }
 
     private onStateChanged(state: GameState) {
@@ -38,39 +40,66 @@ export default class GameOverWindow extends cc.Component {
     }
 
     show() {
+        cc.Tween.stopAllByTarget(this.panel);
+        this.isTransitioning = true;
+        this.setButtonsInteractable(false);
         this.panel.active = true;
         this.background.active = true;
+        this.panel.opacity = 255;
         this.scoreLabel.string = `Очки: ${this.gameStore.score}`;
         this.audioManager.play("fall");
         this.panel.scale = 0.5;
         cc.tween(this.panel)
             .to(0.3, {scale: 1}, {easing: "backOut"})
+            .call(() => {
+                this.isTransitioning = false;
+                this.setButtonsInteractable(true);
+            })
             .start();
     }
 
     public onClickRestart() {
+        if (this.isTransitioning) {
+            return;
+        }
+
         this.gameSessionService.requestRestart();
         this.audioManager.play("click");
         this.hide();
     }
 
     public onClickContinue() {
+        if (this.isTransitioning) {
+            return;
+        }
+
         this.gameSessionService.requestContinue();
         this.audioManager.play("click");
         this.hide();
     }
 
     private hide() {
+        cc.Tween.stopAllByTarget(this.panel);
+        this.isTransitioning = true;
+        this.setButtonsInteractable(false);
         cc.tween(this.panel)
             .to(0.2, {scale: 0, opacity: 0})
             .call(() => {
                 this.panel.active = false;
                 this.panel.opacity = 255;
+                this.isTransitioning = false;
                 if (this.background) {
                     this.background.active = false;
                 }
             })
             .start();
+    }
+
+    private setButtonsInteractable(interactable: boolean) {
+        const buttons = this.panel.getComponentsInChildren(cc.Button);
+        buttons.forEach((button) => {
+            button.interactable = interactable;
+        });
     }
 
     onDestroy() {
