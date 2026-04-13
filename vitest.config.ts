@@ -12,16 +12,14 @@ export default defineConfig({
             reporter: ["text", "html", "json-summary"],
             reportsDirectory: "./coverage",
             include: [
-                "assets/Script/Service/**/*.ts",
-                "assets/Script/Component/GridModel.ts",
-                "assets/Script/Enum/**/*.ts"
+                "assets/script/**/*.ts"
             ],
             exclude: [
-                "assets/Script/**/AudioManager.ts",
-                "assets/Script/**/EffectManager.ts",
-                "assets/Script/**/PoolManager.ts",
-                "assets/Script/**/BoardViewService.ts",
-                "assets/Script/**/registerDefaultServices.ts"
+                "assets/script/**/AudioManager.ts",
+                "assets/script/**/EffectManager.ts",
+                "assets/script/**/PoolManager.ts",
+                "assets/script/**/BoardViewService.ts",
+                "assets/script/**/registerDefaultServices.ts"
             ],
             thresholds: {
                 lines: 80,
@@ -33,7 +31,7 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            "@": path.resolve(__dirname, "assets/Script")
+            "@": path.resolve(__dirname, "assets/script")
         }
     }
 });

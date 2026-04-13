@@ -1,6 +1,6 @@
-import EffectTypes from "../../assets/Script/Gameplay/Types/EffectTypes";
-import {TileType} from "../../assets/Script/Gameplay/Types/TileType";
-import BoosterResolutionService from "../../assets/Script/Gameplay/Boosters/BoosterResolutionService";
+import EffectTypes from "../../assets/script/gameplay/types/EffectTypes";
+import {TileType} from "../../assets/script/gameplay/types/TileType";
+import BoosterResolutionService from "../../assets/script/gameplay/boosters/BoosterResolutionService";
 
 describe("BoosterResolutionService", () => {
     const grid = [

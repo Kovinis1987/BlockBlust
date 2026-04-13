@@ -1,4 +1,4 @@
-import GridPhysicsService from "../../assets/Script/Gameplay/Board/GridPhysicsService";
+import GridPhysicsService from "../../assets/script/gameplay/board/GridPhysicsService";
 
 describe("GridPhysicsService", () => {
     it("resolves chained movements into final node moves", () => {

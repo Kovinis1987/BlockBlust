@@ -1,7 +1,7 @@
-import {GameState} from "../../assets/Script/Gameplay/Types/GameState";
-import GameSignals from "../../assets/Script/Gameplay/Session/GameSignals";
-import GameStateMachine from "../../assets/Script/Gameplay/Session/GameStateMachine";
-import GameStore from "../../assets/Script/Gameplay/Session/GameStore";
+import {GameState} from "../../assets/script/gameplay/types/GameState";
+import GameSignals from "../../assets/script/gameplay/session/GameSignals";
+import GameStateMachine from "../../assets/script/gameplay/session/GameStateMachine";
+import GameStore from "../../assets/script/gameplay/session/GameStore";
 
 describe("GameStateMachine", () => {
     it("switches between supported states", () => {

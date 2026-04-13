@@ -1,6 +1,6 @@
-import EffectTypes from "../../assets/Script/Gameplay/Types/EffectTypes";
-import {TileType} from "../../assets/Script/Gameplay/Types/TileType";
-import GameBoardHelper from "../../assets/Script/Gameplay/Board/GameBoardHelper";
+import EffectTypes from "../../assets/script/gameplay/types/EffectTypes";
+import {TileType} from "../../assets/script/gameplay/types/TileType";
+import GameBoardHelper from "../../assets/script/gameplay/board/GameBoardHelper";
 
 describe("GameBoardHelper", () => {
     it("detects bounds and tile categories", () => {

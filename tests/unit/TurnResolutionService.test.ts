@@ -1,5 +1,5 @@
-import TurnResolutionService from "../../assets/Script/Gameplay/Flow/TurnResolutionService";
-import {TileType} from "../../assets/Script/Gameplay/Types/TileType";
+import TurnResolutionService from "../../assets/script/gameplay/flow/TurnResolutionService";
+import {TileType} from "../../assets/script/gameplay/types/TileType";
 
 function createTileNode(row: number, col: number, type: number) {
     return {

@@ -1,4 +1,4 @@
-import LevelFlowService from "../../assets/Script/Gameplay/Flow/LevelFlowService";
+import LevelFlowService from "../../assets/script/gameplay/flow/LevelFlowService";
 
 describe("LevelFlowService", () => {
     it("resets level progress on initial load when requested", () => {

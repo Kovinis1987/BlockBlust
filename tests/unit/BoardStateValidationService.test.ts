@@ -1,4 +1,4 @@
-import BoardStateValidationService from "../../assets/Script/Gameplay/Board/BoardStateValidationService";
+import BoardStateValidationService from "../../assets/script/gameplay/board/BoardStateValidationService";
 
 function createTileNode(row: number, col: number, type: number) {
     return {

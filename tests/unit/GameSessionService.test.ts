@@ -1,8 +1,8 @@
-import {GameState} from "../../assets/Script/Gameplay/Types/GameState";
-import GameSessionService from "../../assets/Script/Gameplay/Session/GameSessionService";
-import GameSignals from "../../assets/Script/Gameplay/Session/GameSignals";
-import GameStateMachine from "../../assets/Script/Gameplay/Session/GameStateMachine";
-import GameStore, {DEFAULT_SHUFFLE_ATTEMPTS} from "../../assets/Script/Gameplay/Session/GameStore";
+import {GameState} from "../../assets/script/gameplay/types/GameState";
+import GameSessionService from "../../assets/script/gameplay/session/GameSessionService";
+import GameSignals from "../../assets/script/gameplay/session/GameSignals";
+import GameStateMachine from "../../assets/script/gameplay/session/GameStateMachine";
+import GameStore, {DEFAULT_SHUFFLE_ATTEMPTS} from "../../assets/script/gameplay/session/GameStore";
 
 describe("GameSessionService", () => {
     function createSession() {

@@ -1,5 +1,5 @@
-import BoardInputService from "../../assets/Script/Gameplay/Board/BoardInputService";
-import {TileType} from "../../assets/Script/Gameplay/Types/TileType";
+import BoardInputService from "../../assets/script/gameplay/board/BoardInputService";
+import {TileType} from "../../assets/script/gameplay/types/TileType";
 
 function createTileNode(row: number, col: number) {
     const parent = {

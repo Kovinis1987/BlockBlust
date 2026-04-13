@@ -1,9 +1,9 @@
-import {GameState} from "../../assets/Script/Gameplay/Types/GameState";
-import GameProgressionService from "../../assets/Script/Gameplay/Flow/GameProgressionService";
-import GameSessionService from "../../assets/Script/Gameplay/Session/GameSessionService";
-import GameSignals from "../../assets/Script/Gameplay/Session/GameSignals";
-import GameStateMachine from "../../assets/Script/Gameplay/Session/GameStateMachine";
-import GameStore from "../../assets/Script/Gameplay/Session/GameStore";
+import {GameState} from "../../assets/script/gameplay/types/GameState";
+import GameProgressionService from "../../assets/script/gameplay/flow/GameProgressionService";
+import GameSessionService from "../../assets/script/gameplay/session/GameSessionService";
+import GameSignals from "../../assets/script/gameplay/session/GameSignals";
+import GameStateMachine from "../../assets/script/gameplay/session/GameStateMachine";
+import GameStore from "../../assets/script/gameplay/session/GameStore";
 
 describe("GameProgressionService", () => {
     function createContext(overrides: Partial<any> = {}) {

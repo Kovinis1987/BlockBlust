@@ -1,5 +1,5 @@
-import GridModel from "../../assets/Script/Gameplay/Board/GridModel";
-import {TileType} from "../../assets/Script/Gameplay/Types/TileType";
+import GridModel from "../../assets/script/gameplay/board/GridModel";
+import {TileType} from "../../assets/script/gameplay/types/TileType";
 
 describe("GridModel", () => {
     function createModel(rows = 5, cols = 5) {

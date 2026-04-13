@@ -1,0 +1,128 @@
+[
+  {
+    "__type__": "cc.Prefab",
+    "_name": "",
+    "_objFlags": 0,
+    "_native": "",
+    "data": {
+      "__id__": 1
+    },
+    "optimizationPolicy": 0,
+    "asyncLoadAssets": false,
+    "readonly": false
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "GameConfig",
+    "_objFlags": 0,
+    "_parent": null,
+    "_children": [],
+    "_active": true,
+    "_components": [
+      {
+        "__id__": 2
+      }
+    ],
+    "_prefab": {
+      "__id__": 6
+    },
+    "_opacity": 255,
+    "_color": {
+      "__type__": "cc.Color",
+      "r": 255,
+      "g": 255,
+      "b": 255,
+      "a": 255
+    },
+    "_contentSize": {
+      "__type__": "cc.Size",
+      "width": 0,
+      "height": 0
+    },
+    "_anchorPoint": {
+      "__type__": "cc.Vec2",
+      "x": 0.5,
+      "y": 0.5
+    },
+    "_trs": {
+      "__type__": "TypedArray",
+      "ctor": "Float64Array",
+      "array": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "_eulerAngles": {
+      "__type__": "cc.Vec3",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "_skewX": 0,
+    "_skewY": 0,
+    "_is3DNode": false,
+    "_groupIndex": 0,
+    "groupIndex": 0,
+    "_id": ""
+  },
+  {
+    "__type__": "54461d0rXtEVJgVsM1DyG1K",
+    "_name": "",
+    "_objFlags": 0,
+    "node": {
+      "__id__": 1
+    },
+    "_enabled": true,
+    "grid": {
+      "__id__": 3
+    },
+    "economy": {
+      "__id__": 4
+    },
+    "animations": {
+      "__id__": 5
+    },
+    "_id": ""
+  },
+  {
+    "__type__": "GridSettings",
+    "paddingLeft": 35,
+    "paddingBottom": 25,
+    "spacingX": 5,
+    "spacingY": 5
+  },
+  {
+    "__type__": "EconomySettings",
+    "scoreTile": 10,
+    "scoreBooster": 40,
+    "rocketMin": 5,
+    "bombMin": 7,
+    "megaMin": 10,
+    "continueMoves": 5,
+    "minMatch": 3
+  },
+  {
+    "__type__": "AnimationsSettings",
+    "fallDuration": 0.4,
+    "blastWaveDelay": 0.02
+  },
+  {
+    "__type__": "cc.PrefabInfo",
+    "root": {
+      "__id__": 1
+    },
+    "asset": {
+      "__uuid__": "79218b1a-c9a4-4ae0-a09e-bc63c258b927"
+    },
+    "fileId": "5apcoAg1xPZYlo3rM6KTGb",
+    "sync": false
+  }
+]

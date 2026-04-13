@@ -1,9 +1,9 @@
-import {TileType} from "../../assets/Script/Gameplay/Types/TileType";
-import BombBoosterService from "../../assets/Script/Gameplay/Boosters/BombBoosterService";
-import GameSessionService from "../../assets/Script/Gameplay/Session/GameSessionService";
-import GameSignals from "../../assets/Script/Gameplay/Session/GameSignals";
-import GameStateMachine from "../../assets/Script/Gameplay/Session/GameStateMachine";
-import GameStore from "../../assets/Script/Gameplay/Session/GameStore";
+import {TileType} from "../../assets/script/gameplay/types/TileType";
+import BombBoosterService from "../../assets/script/gameplay/boosters/BombBoosterService";
+import GameSessionService from "../../assets/script/gameplay/session/GameSessionService";
+import GameSignals from "../../assets/script/gameplay/session/GameSignals";
+import GameStateMachine from "../../assets/script/gameplay/session/GameStateMachine";
+import GameStore from "../../assets/script/gameplay/session/GameStore";
 
 describe("BombBoosterService", () => {
     function createSession() {

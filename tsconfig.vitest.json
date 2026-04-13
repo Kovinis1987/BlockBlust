@@ -11,7 +11,7 @@
     "noEmit": true
   },
   "include": [
-    "assets/Script/**/*.ts",
+    "assets/script/**/*.ts",
     "tests/**/*.ts",
     "test/**/*.ts",
     "vitest.config.ts"

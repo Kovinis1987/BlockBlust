@@ -1,6 +1,6 @@
-import LevelManager from "../../assets/Script/Gameplay/Session/LevelManager";
-import GameSignals from "../../assets/Script/Gameplay/Session/GameSignals";
-import GameStore from "../../assets/Script/Gameplay/Session/GameStore";
+import LevelManager from "../../assets/script/gameplay/session/LevelManager";
+import GameSignals from "../../assets/script/gameplay/session/GameSignals";
+import GameStore from "../../assets/script/gameplay/session/GameStore";
 
 describe("LevelManager", () => {
     const originalLoad = cc.resources.load;
