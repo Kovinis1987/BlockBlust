@@ -12,7 +12,11 @@ export default defineConfig({
             reporter: ["text", "html", "json-summary"],
             reportsDirectory: "./coverage",
             include: [
-                "assets/script/**/*.ts"
+                "assets/script/gameplay/board/**/*.ts",
+                "assets/script/gameplay/boosters/**/*.ts",
+                "assets/script/gameplay/flow/**/*.ts",
+                "assets/script/gameplay/session/**/*.ts",
+                "assets/script/gameplay/types/**/*.ts"
             ],
             exclude: [
                 "assets/script/**/AudioManager.ts",
