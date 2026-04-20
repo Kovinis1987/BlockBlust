@@ -35,32 +35,38 @@ describe("TurnResolutionService", () => {
             gameSessionService: {
                 useMove
             },
-            getNodesByCoords() {
-                return [{}, {}];
-            },
-            getNodeAt() {
-                return {
-                    getPosition() {
-                        return {x: 0, y: 0};
-                    }
-                };
+            board: {
+                hasTileAt() {
+                    return true;
+                },
+                countTilesAt() {
+                    return 2;
+                },
+                shakeTile() {},
+                destroyTileAt() {
+                    return false;
+                },
+                recycleBoosterAt() {
+                    return false;
+                },
+                getScreenPosition() {
+                    return {x: 0, y: 0};
+                },
+                toWorldPosition(pos: unknown) {
+                    return pos;
+                },
+                showScore() {},
+                spawnCrossFx() {},
+                spawnExplosionFx() {},
+                shakeCamera() {},
+                playSound() {},
+                schedule() {},
+                processPhysics() {}
             },
             setProcessing() {},
-            audioManager: {},
-            effectManager: {},
-            poolManager: {},
-            gridPhysicsService: {},
-            gridContainer: {},
             currentRows: 1,
             currentCols: 3,
-            tileSizeY: 100,
-            getScreenPosition() {
-                return {x: 0, y: 0};
-            },
-            onTileClick() {},
-            spawnBooster() {},
             finalizePhysics() {},
-            scheduleOnce() {},
             config: {
                 economy: {
                     scoreTile: 10
@@ -83,14 +89,8 @@ describe("TurnResolutionService", () => {
                     return [{r: 0, c: 0}];
                 }
             },
-            getNodeAt() {
-                return {
-                    getComponent() {
-                        return {
-                            shake
-                        };
-                    }
-                };
+            board: {
+                shakeTile: shake
             }
         } as any);
 
@@ -125,6 +125,9 @@ describe("TurnResolutionService", () => {
                         {r: 0, c: 3}
                     ];
                 },
+                getTile() {
+                    return TileType.RED;
+                },
                 getBoosterType() {
                     return {type: TileType.ROCKET_VERTICAL};
                 },
@@ -134,38 +137,43 @@ describe("TurnResolutionService", () => {
                 useMove,
                 addScore
             },
-            getNodesByCoords() {
-                return nodes;
-            },
-            getNodeAt() {
-                return nodes[0];
-            },
-            setProcessing() {},
-            audioManager: {},
-            effectManager: {
-                showScoreAnimation
-            },
-            poolManager: {
-                putTile
-            },
-            gridPhysicsService: {
-                process
-            },
-            gridContainer: {
-                convertToWorldSpaceAR(pos: unknown) {
+            board: {
+                hasTileAt() {
+                    return true;
+                },
+                countTilesAt() {
+                    return nodes.length;
+                },
+                shakeTile() {},
+                destroyTileAt(_r: number, _c: number, onComplete: Function) {
+                    putTile();
+                    onComplete();
+                    return true;
+                },
+                recycleBoosterAt() {
+                    return false;
+                },
+                spawnBooster,
+                getScreenPosition(r: number, c: number) {
+                    return {x: c * 10, y: r * 10};
+                },
+                toWorldPosition(pos: unknown) {
                     return pos;
+                },
+                showScore: showScoreAnimation,
+                spawnCrossFx() {},
+                spawnExplosionFx() {},
+                shakeCamera() {},
+                playSound() {},
+                schedule() {},
+                processPhysics() {
+                    process();
                 }
             },
+            setProcessing() {},
             currentRows: 1,
             currentCols: 4,
-            tileSizeY: 100,
-            getScreenPosition(r: number, c: number) {
-                return {x: c * 10, y: r * 10};
-            },
-            onTileClick() {},
-            spawnBooster,
             finalizePhysics() {},
-            scheduleOnce() {},
             config: {
                 economy: {
                     scoreTile: 10
@@ -187,7 +195,7 @@ describe("TurnResolutionService", () => {
         const service = new TurnResolutionService();
         const process = vi.fn();
         const addScore = vi.fn();
-        const spawnExplosionFX = vi.fn();
+        const spawnExplosionFx = vi.fn();
         const shakeCamera = vi.fn();
         const clearCells = vi.fn();
         const putBooster = vi.fn();
@@ -216,54 +224,46 @@ describe("TurnResolutionService", () => {
             gameSessionService: {
                 addScore
             },
-            getNodesByCoords(coords: Array<{r: number; c: number}>) {
-                return coords
-                    .map((coord) => {
-                        if (coord.r === 1 && coord.c === 0) return leftNode;
-                        if (coord.r === 1 && coord.c === 2) return rightNode;
-                        return null;
-                    })
-                    .filter(Boolean);
-            },
-            getNodeAt(row: number, col: number) {
-                if (row === 1 && col === 1) {
-                    return centerNode;
+            board: {
+                hasTileAt(row: number, col: number) {
+                    return (row === 1 && col === 1) || (row === 1 && col === 0) || (row === 1 && col === 2);
+                },
+                countTilesAt(coords: Array<{r: number; c: number}>) {
+                    return coords.filter((coord) => this.hasTileAt(coord.r, coord.c)).length;
+                },
+                shakeTile() {},
+                destroyTileAt(_r: number, _c: number, onComplete: Function) {
+                    putTile();
+                    onComplete();
+                    return true;
+                },
+                spawnBooster() {},
+                spawnCrossFx() {},
+                spawnExplosionFx,
+                showScore() {},
+                shakeCamera,
+                playSound() {},
+                recycleBoosterAt(_r: number, _c: number, type: number) {
+                    putBooster(centerNode, type);
+                    return true;
+                },
+                processPhysics() {
+                    process();
+                },
+                toWorldPosition(pos: unknown) {
+                    return pos;
+                },
+                getScreenPosition(r: number, c: number) {
+                    return {x: c * 10, y: r * 10};
+                },
+                schedule(callback: Function) {
+                    callback();
                 }
-
-                return null;
             },
             setProcessing() {},
-            audioManager: {},
-            effectManager: {
-                shakeCamera,
-                spawnCrossFX() {},
-                spawnExplosionFX,
-                showScoreAnimation() {}
-            },
-            poolManager: {
-                putBooster,
-                putTile
-            },
-            gridPhysicsService: {
-                process
-            },
-            gridContainer: {
-                convertToWorldSpaceAR(pos: unknown) {
-                    return pos;
-                }
-            },
             currentRows: 3,
             currentCols: 3,
-            tileSizeY: 100,
-            getScreenPosition(r: number, c: number) {
-                return {x: c * 10, y: r * 10};
-            },
-            onTileClick() {},
-            spawnBooster() {},
             finalizePhysics() {},
-            scheduleOnce(callback: Function) {
-                callback();
-            },
             config: {
                 boosters: {
                     bombRadius: 1
@@ -279,7 +279,7 @@ describe("TurnResolutionService", () => {
         } as any);
 
         expect(shakeCamera).toHaveBeenCalled();
-        expect(spawnExplosionFX).toHaveBeenCalled();
+        expect(spawnExplosionFx).toHaveBeenCalled();
         expect(clearCells).toHaveBeenCalled();
         expect(putBooster).toHaveBeenCalledWith(centerNode, TileType.ROCKET_VERTICAL);
         expect(putTile).toHaveBeenCalledTimes(2);

@@ -1,5 +1,3 @@
-import {appContainer} from "../../Core/DiContainer";
-import {SERVICE_TOKENS} from "../../Core/ServiceTokens";
 const { ccclass, property } = cc._decorator;
 
 type SfxPlayOptions = {
@@ -25,7 +23,6 @@ export default class AudioManager extends cc.Component {
     private _lastPlayByKey: {[key: string]: number} = {};
 
     onLoad() {
-        appContainer.registerInstance(SERVICE_TOKENS.audioManager, this);
         cc.game.addPersistRootNode(this.node);
 
         this.scheduleOnce(() => {

@@ -1,4 +1,4 @@
-import {TileType} from "../../Gameplay/Types/TileType";
+import {TileType} from "../../gameplay/types/TileType";
 
 const { ccclass, property } = cc._decorator;
 

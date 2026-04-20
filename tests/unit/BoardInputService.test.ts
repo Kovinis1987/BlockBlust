@@ -52,13 +52,14 @@ describe("BoardInputService", () => {
                     return 2;
                 }
             },
-            gameStore: {},
             setProcessing() {},
-            getNodeAt() {
-                return null;
-            },
             activateBooster() {},
             tryBlast() {},
+            highlightTeleportSelection() {},
+            clearTeleportSelectionVisual() {},
+            swapTeleportTiles(_first: unknown, _second: unknown, onComplete: Function) {
+                onComplete();
+            },
             onTeleportCompleted() {}
         } as any);
 
@@ -97,13 +98,14 @@ describe("BoardInputService", () => {
                     return 8;
                 }
             },
-            gameStore: {},
             setProcessing() {},
-            getNodeAt() {
-                return null;
-            },
             activateBooster,
             tryBlast() {},
+            highlightTeleportSelection() {},
+            clearTeleportSelectionVisual() {},
+            swapTeleportTiles(_first: unknown, _second: unknown, onComplete: Function) {
+                onComplete();
+            },
             onTeleportCompleted() {}
         } as any);
 
@@ -119,6 +121,10 @@ describe("BoardInputService", () => {
         const setProcessing = vi.fn();
         const onTeleportCompleted = vi.fn();
         const play = vi.fn();
+
+        const highlightTeleportSelection = vi.fn();
+        const clearTeleportSelectionVisual = vi.fn();
+        const swapTeleportTiles = vi.fn((_first, _second, onComplete: Function) => onComplete());
 
         const context = {
             isProcessing: false,
@@ -148,17 +154,12 @@ describe("BoardInputService", () => {
                 },
                 setTile
             },
-            gameStore: {},
             setProcessing,
-            getNodeAt(row: number, col: number) {
-                if (row === 0 && col === 0) {
-                    return firstNode;
-                }
-
-                return secondNode;
-            },
             activateBooster() {},
             tryBlast() {},
+            highlightTeleportSelection,
+            clearTeleportSelectionVisual,
+            swapTeleportTiles,
             onTeleportCompleted
         } as any;
 
@@ -166,6 +167,9 @@ describe("BoardInputService", () => {
         service.handleTileClick(1, 1, context);
 
         expect(play).toHaveBeenCalledWith("click");
+        expect(highlightTeleportSelection).toHaveBeenCalledWith({r: 0, c: 0});
+        expect(clearTeleportSelectionVisual).toHaveBeenCalledWith({r: 0, c: 0});
+        expect(swapTeleportTiles).toHaveBeenCalledWith({r: 0, c: 0}, {r: 1, c: 1}, expect.any(Function));
         expect(setTile).toHaveBeenNthCalledWith(1, 0, 0, TileType.BLUE);
         expect(setTile).toHaveBeenNthCalledWith(2, 1, 1, TileType.RED);
         expect(setProcessing).toHaveBeenCalledWith(true);

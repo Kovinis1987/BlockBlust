@@ -1,10 +1,12 @@
-import GameSignals from "../../Gameplay/Session/GameSignals";
-import GameStore from "../../Gameplay/Session/GameStore";
-import {registerDefaultServices} from "../../Core/registerDefaultServices";
-import {appContainer} from "../../Core/DiContainer";
-import {SERVICE_TOKENS} from "../../Core/ServiceTokens";
+import GameSignals from "../../gameplay/session/GameSignals";
+import GameStore from "../../gameplay/session/GameStore";
 
 const {ccclass, property} = cc._decorator;
+
+export interface ScoreUiDependencies {
+    gameSignals: GameSignals;
+    gameStore: GameStore;
+}
 
 @ccclass
 export default class ScoreUIController extends cc.Component {
@@ -18,9 +20,16 @@ export default class ScoreUIController extends cc.Component {
     private gameStore: GameStore;
 
     onLoad() {
-        registerDefaultServices();
-        this.gameSignals = appContainer.resolve(SERVICE_TOKENS.gameSignals);
-        this.gameStore = appContainer.resolve(SERVICE_TOKENS.gameStore);
+    }
+
+    public initialize(dependencies: ScoreUiDependencies): void {
+        if (this.gameSignals) {
+            this.gameSignals.off(GameSignals.EVT_SCORE_CHANGED, this.updateScore, this);
+            this.gameSignals.off(GameSignals.EVT_MOVES_CHANGED, this.updateMoves, this);
+        }
+
+        this.gameSignals = dependencies.gameSignals;
+        this.gameStore = dependencies.gameStore;
         this.gameSignals.on(GameSignals.EVT_SCORE_CHANGED, this.updateScore, this);
         this.gameSignals.on(GameSignals.EVT_MOVES_CHANGED, this.updateMoves, this);
 
@@ -50,6 +59,10 @@ export default class ScoreUIController extends cc.Component {
     }
 
     onDestroy() {
+        if (!this.gameSignals) {
+            return;
+        }
+
         this.gameSignals.off(GameSignals.EVT_SCORE_CHANGED, this.updateScore, this);
         this.gameSignals.off(GameSignals.EVT_MOVES_CHANGED, this.updateMoves, this);
     }

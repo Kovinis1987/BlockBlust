@@ -1,9 +1,9 @@
-import TileComponent from "../../Presentation/Components/TileComponent";
+import TileComponent from "../../presentation/components/TileComponent";
 import GridModel from "./GridModel";
-import GameConfig from "../../Config/GameConfig";
-import {TileType} from "../Types/TileType";
+import GameConfig from "../../config/GameConfig";
+import {TileType} from "../types/TileType";
 import GameBoardHelper from "./GameBoardHelper";
-import PoolManager from "../../Infrastructure/Pooling/PoolManager";
+import PoolManager from "../../infrastructure/pooling/PoolManager";
 
 export interface BoardViewState {
     model: GridModel;

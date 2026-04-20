@@ -1,4 +1,4 @@
-import TileComponent from "../../Presentation/Components/TileComponent";
+import TileComponent from "../../presentation/components/TileComponent";
 import GameBoardHelper from "./GameBoardHelper";
 
 export interface BoardStateValidationContext {

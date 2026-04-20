@@ -33,9 +33,12 @@ describe("BombBoosterService", () => {
         const {gameStateMachine, gameSessionService} = createSession();
 
         const context = {
-            turnResolutionContext: {
+            resolutionContext: {
                 model: {
                     getTile: () => TileType.OBSTACLE
+                },
+                board: {
+                    hasTileAt: () => false
                 }
             },
             gameSessionService,
@@ -43,7 +46,6 @@ describe("BombBoosterService", () => {
             bombRadius: 1,
             currentRows: 3,
             currentCols: 3,
-            getNodeAt: () => null
         } as any;
 
         expect(service.tryUse(1, 1, context)).toBe(false);
@@ -60,7 +62,7 @@ describe("BombBoosterService", () => {
         ]);
 
         const context = {
-            turnResolutionContext: {
+            resolutionContext: {
                 model: {
                     getTile(r: number, c: number) {
                         if (r === 1 && c === 2) {
@@ -70,41 +72,38 @@ describe("BombBoosterService", () => {
                     },
                     clearCells() {}
                 },
-                effectManager: {
-                    shakeCamera() {},
-                    spawnExplosionFX() {},
-                    showScoreAnimation() {}
-                },
                 gameSessionService,
-                audioManager: {
-                    play() {}
-                },
-                poolManager: {
-                    putTile() {}
-                },
-                gridContainer: {
-                    convertToWorldSpaceAR(pos: unknown) {
-                        return pos;
-                    }
-                },
                 config: {
                     economy: {
                         scoreTile: 10
                     }
                 },
-                setProcessing() {}
+                setProcessing() {},
+                board: {
+                    shakeCamera() {},
+                    spawnExplosionFx() {},
+                    playSound() {},
+                    getScreenPosition(r: number, c: number) {
+                        return {x: c, y: r};
+                    },
+                    toWorldPosition(pos: unknown) {
+                        return pos;
+                    },
+                    showScore() {},
+                    hasTileAt(r: number, c: number) {
+                        return nodeMap.has(`${r},${c}`);
+                    },
+                    destroyTileAt(_r: number, _c: number, onComplete: Function) {
+                        onComplete();
+                        return true;
+                    }
+                }
             },
             gameSessionService,
             gameStateMachine,
             bombRadius: 1,
             currentRows: 3,
             currentCols: 3,
-            getNodeAt(r: number, c: number) {
-                return nodeMap.get(`${r},${c}`) || null;
-            },
-            getScreenPosition(r: number, c: number) {
-                return {x: c, y: r};
-            },
             activateBooster(r: number, c: number, type: number) {
                 activated.push({r, c, type});
             },

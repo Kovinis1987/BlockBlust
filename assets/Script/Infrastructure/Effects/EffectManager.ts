@@ -1,6 +1,6 @@
-import AudioManager from "../Audio/AudioManager";
-import EffectTypes from "../../Gameplay/Types/EffectTypes";
-import PoolManager from "../Pooling/PoolManager";
+import AudioManager from "../audio/AudioManager";
+import EffectTypes from "../../gameplay/types/EffectTypes";
+import PoolManager from "../pooling/PoolManager";
 
 export default class EffectManager {
     private readonly durations = {

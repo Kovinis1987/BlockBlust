@@ -1,4 +1,4 @@
-import TileComponent from "../../Presentation/Components/TileComponent";
+import TileComponent from "../../presentation/components/TileComponent";
 
 const {ccclass, property} = cc._decorator;
 

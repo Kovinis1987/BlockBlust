@@ -1,6 +1,6 @@
 import GridModel from "./GridModel";
-import PoolManager from "../../Infrastructure/Pooling/PoolManager";
-import TileComponent from "../../Presentation/Components/TileComponent";
+import PoolManager from "../../infrastructure/pooling/PoolManager";
+import TileComponent from "../../presentation/components/TileComponent";
 
 export interface GridPhysicsContext {
     model: GridModel;

@@ -1,27 +1,25 @@
-import TileComponent from "../../Presentation/Components/TileComponent";
-import EffectTypes from "../Types/EffectTypes";
-import GameBoardHelper from "../Board/GameBoardHelper";
-import GameSessionService from "../Session/GameSessionService";
-import GameStateMachine from "../Session/GameStateMachine";
-import {TurnResolutionContext} from "../Flow/TurnResolutionService";
+import EffectTypes from "../types/EffectTypes";
+import GameBoardHelper from "../board/GameBoardHelper";
+import GameSessionService from "../session/GameSessionService";
+import GameStateMachine from "../session/GameStateMachine";
+import {TurnResolutionContext} from "../flow/TurnResolutionService";
+import {BoardRuntimePort} from "../flow/BoardRuntimePort";
 
 export interface BombBoosterContext {
-    turnResolutionContext: TurnResolutionContext;
+    resolutionContext: TurnResolutionContext;
     gameSessionService: GameSessionService;
     gameStateMachine: GameStateMachine;
     bombRadius: number;
     currentRows: number;
     currentCols: number;
-    getNodeAt: (r: number, c: number) => cc.Node | null;
-    getScreenPosition: (r: number, c: number) => cc.Vec2;
     activateBooster: (r: number, c: number, type: number) => void;
     onFinished: () => void;
 }
 
 export default class BombBoosterService {
     public tryUse(centerRow: number, centerCol: number, context: BombBoosterContext): boolean {
-        const centerNode = context.getNodeAt(centerRow, centerCol);
-        if (!centerNode || GameBoardHelper.isObstacleType(context.turnResolutionContext.model.getTile(centerRow, centerCol))) {
+        const board = context.resolutionContext.board;
+        if (!board.hasTileAt(centerRow, centerCol) || GameBoardHelper.isObstacleType(context.resolutionContext.model.getTile(centerRow, centerCol))) {
             return false;
         }
 
@@ -30,16 +28,12 @@ export default class BombBoosterService {
             return false;
         }
 
-        context.turnResolutionContext.setProcessing(true);
-        context.turnResolutionContext.effectManager.shakeCamera();
+        context.resolutionContext.setProcessing(true);
+        board.shakeCamera();
 
-        const centerPos = context.getScreenPosition(centerRow, centerCol);
-        context.turnResolutionContext.effectManager.spawnExplosionFX(
-            context.turnResolutionContext.gridContainer,
-            centerPos,
-            EffectTypes.BOMB
-        );
-        context.turnResolutionContext.audioManager.play("booster");
+        const centerPos = board.getScreenPosition(centerRow, centerCol);
+        board.spawnExplosionFx(centerPos, EffectTypes.BOMB);
+        board.playSound("booster");
 
         for (const {r, c, type} of affectedNodes) {
             if (GameBoardHelper.isBoosterType(type)) {
@@ -47,25 +41,33 @@ export default class BombBoosterService {
             }
         }
 
-        context.turnResolutionContext.model.clearCells(affectedNodes.map(node => ({r: node.r, c: node.c})));
-        this.awardScore(affectedNodes, centerPos, context.turnResolutionContext.gameSessionService, context.turnResolutionContext);
+        context.resolutionContext.model.clearCells(affectedNodes.map(node => ({r: node.r, c: node.c})));
+        this.awardScore(
+            affectedNodes,
+            centerPos,
+            context.resolutionContext.gameSessionService,
+            board,
+            context.resolutionContext.config.economy.scoreTile
+        );
 
         let pendingAnimations = 0;
         let isFinished = false;
-        for (const {type, node} of affectedNodes) {
+        for (const {type, r, c} of affectedNodes) {
             if (GameBoardHelper.isBoosterType(type)) {
                 continue;
             }
 
-            pendingAnimations++;
-            node.getComponent(TileComponent).destroyTile(() => {
-                context.turnResolutionContext.poolManager.putTile(node);
+            if (!board.destroyTileAt(r, c, () => {
                 pendingAnimations--;
                 if (pendingAnimations <= 0 && !isFinished) {
                     isFinished = true;
                     this.finishUse(context);
                 }
-            });
+            })) {
+                continue;
+            }
+
+            pendingAnimations++;
         }
 
         if (pendingAnimations === 0 && !isFinished) {
@@ -80,8 +82,9 @@ export default class BombBoosterService {
         centerRow: number,
         centerCol: number,
         context: BombBoosterContext
-    ): Array<{ r: number; c: number; node: cc.Node; type: number }> {
-        const positions: Array<{ r: number; c: number; node: cc.Node; type: number }> = [];
+    ): Array<{ r: number; c: number; type: number }> {
+        const positions: Array<{ r: number; c: number; type: number }> = [];
+        const board = context.resolutionContext.board;
 
         for (const {r, c} of GameBoardHelper.collectSquareCells(
             centerRow,
@@ -90,10 +93,9 @@ export default class BombBoosterService {
             context.currentRows,
             context.currentCols
         )) {
-            const tileNode = context.getNodeAt(r, c);
-            const type = context.turnResolutionContext.model.getTile(r, c);
-            if (tileNode && !GameBoardHelper.isObstacleType(type)) {
-                positions.push({r, c, node: tileNode, type});
+            const type = context.resolutionContext.model.getTile(r, c);
+            if (board.hasTileAt(r, c) && !GameBoardHelper.isObstacleType(type)) {
+                positions.push({r, c, type});
             }
         }
 
@@ -101,28 +103,26 @@ export default class BombBoosterService {
     }
 
     private awardScore(
-        nodes: Array<{ node: cc.Node; r: number; c: number }>,
+        nodes: Array<{ r: number; c: number; type: number }>,
         localPosition: cc.Vec2,
         gameSessionService: GameSessionService,
-        turnResolutionContext: TurnResolutionContext
+        board: BoardRuntimePort,
+        scorePerTile: number
     ): void {
-        const worldPos = turnResolutionContext.gridContainer.convertToWorldSpaceAR(localPosition);
-        const normalTiles = nodes.filter(node => {
-            const type = node.node.getComponent(TileComponent).type;
-            return GameBoardHelper.isColorType(type);
-        });
+        const worldPos = board.toWorldPosition(localPosition);
+        const normalTiles = nodes.filter(node => GameBoardHelper.isColorType(node.type));
 
         if (normalTiles.length <= 0) {
             return;
         }
 
-        const points = normalTiles.length * turnResolutionContext.config.economy.scoreTile;
+        const points = normalTiles.length * scorePerTile;
         gameSessionService.addScore(points);
-        turnResolutionContext.effectManager.showScoreAnimation(worldPos, points);
+        board.showScore(worldPos, points);
     }
 
     private finishUse(context: BombBoosterContext): void {
-        context.turnResolutionContext.setProcessing(false);
+        context.resolutionContext.setProcessing(false);
         context.gameStateMachine.enterPlaying();
         context.gameSessionService.useBombBooster();
         context.onFinished();

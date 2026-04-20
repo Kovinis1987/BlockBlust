@@ -1,7 +1,7 @@
-import GridModel from "../Board/GridModel";
-import GameSessionService from "../Session/GameSessionService";
-import GameStateMachine from "../Session/GameStateMachine";
-import GameStore from "../Session/GameStore";
+import GridModel from "../board/GridModel";
+import GameSessionService from "../session/GameSessionService";
+import GameStateMachine from "../session/GameStateMachine";
+import GameStore from "../session/GameStore";
 
 export interface GameProgressionContext {
     model: GridModel;

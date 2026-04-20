@@ -1,4 +1,4 @@
-import {GameState} from "../Types/GameState";
+import {GameState} from "../types/GameState";
 import GameStore from "./GameStore";
 
 export default class GameStateMachine {

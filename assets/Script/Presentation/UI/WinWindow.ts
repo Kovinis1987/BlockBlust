@@ -1,13 +1,17 @@
 import ccclass = cc._decorator.ccclass;
 import property = cc._decorator.property;
-import {GameState} from "../../Gameplay/Types/GameState";
-import AudioManager from "../../Infrastructure/Audio/AudioManager";
-import GameSessionService from "../../Gameplay/Session/GameSessionService";
-import GameSignals from "../../Gameplay/Session/GameSignals";
-import GameStore from "../../Gameplay/Session/GameStore";
-import {registerDefaultServices} from "../../Core/registerDefaultServices";
-import {appContainer} from "../../Core/DiContainer";
-import {SERVICE_TOKENS} from "../../Core/ServiceTokens";
+import {GameState} from "../../gameplay/types/GameState";
+import AudioManager from "../../infrastructure/audio/AudioManager";
+import GameSessionService from "../../gameplay/session/GameSessionService";
+import GameSignals from "../../gameplay/session/GameSignals";
+import GameStore from "../../gameplay/session/GameStore";
+
+export interface WinWindowDependencies {
+    gameSignals: GameSignals;
+    gameStore: GameStore;
+    gameSessionService: GameSessionService;
+    audioManager: AudioManager;
+}
 
 @ccclass
 export default class WinWindow extends cc.Component {
@@ -22,15 +26,20 @@ export default class WinWindow extends cc.Component {
     private isTransitioning = false;
 
     onLoad() {
-        registerDefaultServices();
-        this.gameSignals = appContainer.resolve(SERVICE_TOKENS.gameSignals);
-        this.gameStore = appContainer.resolve(SERVICE_TOKENS.gameStore);
-        this.gameSessionService = appContainer.resolve(SERVICE_TOKENS.gameSessionService);
-        this.audioManager = appContainer.resolve(SERVICE_TOKENS.audioManager);
-
-        this.gameSignals.on(GameSignals.EVT_STATE_CHANGED, this.onStateChanged, this);
         this.panel.active = false;
         this.setButtonsInteractable(false);
+    }
+
+    public initialize(dependencies: WinWindowDependencies): void {
+        if (this.gameSignals) {
+            this.gameSignals.off(GameSignals.EVT_STATE_CHANGED, this.onStateChanged, this);
+        }
+
+        this.gameSignals = dependencies.gameSignals;
+        this.gameStore = dependencies.gameStore;
+        this.gameSessionService = dependencies.gameSessionService;
+        this.audioManager = dependencies.audioManager;
+        this.gameSignals.on(GameSignals.EVT_STATE_CHANGED, this.onStateChanged, this);
     }
 
     private onStateChanged(state: GameState) {
@@ -91,6 +100,10 @@ export default class WinWindow extends cc.Component {
     }
 
     onDestroy() {
+        if (!this.gameSignals) {
+            return;
+        }
+
         this.gameSignals.off(GameSignals.EVT_STATE_CHANGED, this.onStateChanged, this);
     }
 }
