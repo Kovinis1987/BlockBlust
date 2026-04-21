@@ -1,4 +1,4 @@
-import {GameState} from "../Types/GameState";
+import {GameState} from "../types/GameState";
 import GameSignals from "./GameSignals";
 
 export const DEFAULT_MOVES = 25;

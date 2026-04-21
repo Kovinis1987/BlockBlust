@@ -1,4 +1,4 @@
-import {LevelData} from "../Data/LevelData";
+import {LevelData} from "../data/LevelData";
 import GameStore from "./GameStore";
 
 export interface LoadedLevelData extends LevelData {

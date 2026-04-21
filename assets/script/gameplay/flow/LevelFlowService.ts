@@ -1,6 +1,6 @@
-import LevelManager, {LoadedLevelData} from "../Session/LevelManager";
+import LevelManager, {LoadedLevelData} from "../session/LevelManager";
 import GameProgressionService, {GameProgressionContext} from "./GameProgressionService";
-import GameSessionService from "../Session/GameSessionService";
+import GameSessionService from "../session/GameSessionService";
 
 export interface LevelFlowContext {
     levelManager: LevelManager;

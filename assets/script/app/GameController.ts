@@ -1,28 +1,29 @@
-import TileComponent from "../Presentation/Components/TileComponent";
-import GridModel from "../Gameplay/Board/GridModel";
-import BoosterButtonTeleport from "../Presentation/Components/BoosterButtonTeleport";
-import BoosterBombButton from "../Presentation/Components/BoosterBombButton";
-import GameConfig from "../Config/GameConfig";
-import {appContainer} from "../Core/DiContainer";
-import {SERVICE_TOKENS} from "../Core/ServiceTokens";
-import {registerDefaultServices} from "../Core/registerDefaultServices";
-import AudioManager from "../Infrastructure/Audio/AudioManager";
-import BoardInputService from "../Gameplay/Board/BoardInputService";
-import BoardStateValidationService from "../Gameplay/Board/BoardStateValidationService";
-import BoardViewService from "../Gameplay/Board/BoardViewService";
-import BombBoosterService from "../Gameplay/Boosters/BombBoosterService";
-import EffectManager from "../Infrastructure/Effects/EffectManager";
-import GameBoardHelper from "../Gameplay/Board/GameBoardHelper";
-import LevelFlowService from "../Gameplay/Flow/LevelFlowService";
-import GameProgressionService from "../Gameplay/Flow/GameProgressionService";
-import GameSessionService from "../Gameplay/Session/GameSessionService";
-import GameSignals from "../Gameplay/Session/GameSignals";
-import GameStateMachine from "../Gameplay/Session/GameStateMachine";
-import GameStore from "../Gameplay/Session/GameStore";
-import GridPhysicsService from "../Gameplay/Board/GridPhysicsService";
-import LevelManager, {LoadedLevelData} from "../Gameplay/Session/LevelManager";
-import PoolManager from "../Infrastructure/Pooling/PoolManager";
-import TurnResolutionService from "../Gameplay/Flow/TurnResolutionService";
+import GridModel from "../gameplay/board/GridModel";
+import BoosterButtonTeleport from "../presentation/components/BoosterButtonTeleport";
+import BoosterBombButton from "../presentation/components/BoosterBombButton";
+import GameConfig from "../config/GameConfig";
+import {createGameRuntime, GameRuntime} from "../core/GameRuntime";
+import AudioManager from "../infrastructure/audio/AudioManager";
+import BoardInputService from "../gameplay/board/BoardInputService";
+import BoardStateValidationService from "../gameplay/board/BoardStateValidationService";
+import BoardViewService from "../gameplay/board/BoardViewService";
+import BombBoosterService from "../gameplay/boosters/BombBoosterService";
+import EffectManager from "../infrastructure/effects/EffectManager";
+import LevelFlowService from "../gameplay/flow/LevelFlowService";
+import GameProgressionService from "../gameplay/flow/GameProgressionService";
+import GameSessionService from "../gameplay/session/GameSessionService";
+import GameSignals from "../gameplay/session/GameSignals";
+import GameStateMachine from "../gameplay/session/GameStateMachine";
+import GameStore from "../gameplay/session/GameStore";
+import GridPhysicsService from "../gameplay/board/GridPhysicsService";
+import LevelManager, {LoadedLevelData} from "../gameplay/session/LevelManager";
+import PoolManager from "../infrastructure/pooling/PoolManager";
+import TurnResolutionService from "../gameplay/flow/TurnResolutionService";
+import {BoardRuntimePort} from "../gameplay/flow/BoardRuntimePort";
+import BoardSceneService from "../presentation/Board/BoardSceneService";
+import ScoreUIController from "../presentation/ui/ScoreUIController";
+import GameOverWindow from "../presentation/ui/GameOverWindow";
+import WinWindow from "../presentation/ui/WinWindow";
 
 const {ccclass, property} = cc._decorator;
 
@@ -50,17 +51,18 @@ export default class GameController extends cc.Component {
     private currentRows = 8;
     private currentCols = 8;
 
+    private runtime: GameRuntime;
+    private boardSceneService: BoardSceneService;
     private gameSignals: GameSignals;
     private gameStore: GameStore;
     private gameSessionService: GameSessionService;
-    private gameProgressionService: GameProgressionService = new GameProgressionService();
-    private levelFlowService: LevelFlowService = new LevelFlowService(this.gameProgressionService);
-    private boardInputService: BoardInputService = new BoardInputService();
-    private boardStateValidationService: BoardStateValidationService = new BoardStateValidationService();
-    private boardViewService: BoardViewService = new BoardViewService();
-    private gridPhysicsService: GridPhysicsService = new GridPhysicsService();
-    private turnResolutionService: TurnResolutionService = new TurnResolutionService();
-    private bombBoosterService: BombBoosterService = new BombBoosterService();
+    private gameProgressionService: GameProgressionService;
+    private levelFlowService: LevelFlowService;
+    private boardInputService: BoardInputService;
+    private boardStateValidationService: BoardStateValidationService;
+    private gridPhysicsService: GridPhysicsService;
+    private turnResolutionService: TurnResolutionService;
+    private bombBoosterService: BombBoosterService;
     private levelManager: LevelManager;
     private audioManager: AudioManager;
     private effectManager: EffectManager;
@@ -68,15 +70,37 @@ export default class GameController extends cc.Component {
     private gameStateMachine: GameStateMachine;
 
     public onLoad() {
-        registerDefaultServices();
-        this.gameSignals = appContainer.resolve(SERVICE_TOKENS.gameSignals);
-        this.gameStore = appContainer.resolve(SERVICE_TOKENS.gameStore);
-        this.gameStateMachine = appContainer.resolve(SERVICE_TOKENS.gameStateMachine);
-        this.gameSessionService = appContainer.resolve(SERVICE_TOKENS.gameSessionService);
-        this.levelManager = appContainer.resolve(SERVICE_TOKENS.levelManager);
-        this.audioManager = appContainer.resolve(SERVICE_TOKENS.audioManager);
-        this.effectManager = appContainer.resolve(SERVICE_TOKENS.effectManager);
-        this.poolManager = appContainer.resolve(SERVICE_TOKENS.poolManager);
+        this.audioManager = this.requireSceneComponent(AudioManager);
+        this.poolManager = this.requireSceneComponent(PoolManager);
+        this.gridPhysicsService = new GridPhysicsService();
+
+        this.runtime = createGameRuntime({
+            audioManager: this.audioManager,
+            poolManager: this.poolManager,
+        });
+        this.boardSceneService = new BoardSceneService(
+            this.gridContainer,
+            this.obstaclePrefab,
+            this.config,
+            this.poolManager,
+            new BoardViewService(),
+            this.gridPhysicsService
+        );
+
+        this.gameSignals = this.runtime.gameSignals;
+        this.gameStore = this.runtime.gameStore;
+        this.gameStateMachine = this.runtime.gameStateMachine;
+        this.gameSessionService = this.runtime.gameSessionService;
+        this.levelManager = this.runtime.levelManager;
+        this.effectManager = this.runtime.effectManager;
+        this.gameProgressionService = this.runtime.gameProgressionService;
+        this.levelFlowService = this.runtime.levelFlowService;
+        this.boardInputService = this.runtime.boardInputService;
+        this.boardStateValidationService = this.runtime.boardStateValidationService;
+        this.turnResolutionService = this.runtime.turnResolutionService;
+        this.bombBoosterService = this.runtime.bombBoosterService;
+
+        this.initializePresentation();
 
         this.gameSignals.on(GameSignals.EVT_CONTINUE, this.handleContinue, this);
         this.boosterButtonTeleport.node.on(GameSignals.EVT_BOOSTER_TELEPORT, this.onTeleportModeToggle, this);
@@ -110,7 +134,7 @@ export default class GameController extends cc.Component {
     }
 
     private setupGame(levelData: LoadedLevelData) {
-        const boardState = this.boardViewService.buildBoard(
+        const boardState = this.boardSceneService.buildBoard(
             levelData.rows,
             levelData.cols,
             levelData.tiles,
@@ -120,7 +144,13 @@ export default class GameController extends cc.Component {
                 bombs: levelData.startBombTiles,
                 megas: levelData.startMegaTiles,
             },
-            this.createBoardViewContext()
+            this.tileSizeX,
+            this.tileSizeY,
+            (r, c) => this.onTileClick(r, c),
+            (callback, delay) => this.scheduleOnce(callback, delay),
+            (value) => {
+                this.isProcessing = value;
+            }
         );
         this.currentRows = boardState.rows;
         this.currentCols = boardState.cols;
@@ -130,30 +160,33 @@ export default class GameController extends cc.Component {
     }
 
     private spawnBooster(r: number, c: number, type: number) {
-        this.boardViewService.spawnBooster(this.model, r, c, type, this.createBoardViewContext());
+        this.boardSceneService.spawnBooster(
+            this.model,
+            r,
+            c,
+            type,
+            this.tileSizeX,
+            this.tileSizeY,
+            (row, col) => this.onTileClick(row, col),
+            (callback, delay) => this.scheduleOnce(callback, delay),
+            (value) => {
+                this.isProcessing = value;
+            }
+        );
     }
 
     private getScreenPosition(r: number, c: number): cc.Vec2 {
-        return this.boardViewService.getScreenPosition(
-            r,
-            c,
-            this.gridContainer,
-            this.config,
-            this.tileSizeX,
-            this.tileSizeY
-        );
+        return this.boardSceneService.getScreenPosition(r, c, this.tileSizeX, this.tileSizeY);
     }
 
     private handleBombClick(centerR: number, centerC: number): boolean {
         return this.bombBoosterService.tryUse(centerR, centerC, {
-            turnResolutionContext: this.createTurnResolutionContext(),
+            resolutionContext: this.createTurnResolutionContext(),
             gameSessionService: this.gameSessionService,
             gameStateMachine: this.gameStateMachine,
             bombRadius: this.config.boosters.bombRadius,
             currentRows: this.currentRows,
             currentCols: this.currentCols,
-            getNodeAt: (r, c) => this.getNodeAt(r, c),
-            getScreenPosition: (r, c) => this.getScreenPosition(r, c),
             activateBooster: (r, c, type) => this.activateBooster(r, c, type),
             onFinished: () => {
                 this.turnResolutionService.processGridPhysics(this.createTurnResolutionContext());
@@ -179,7 +212,6 @@ export default class GameController extends cc.Component {
 
         this.boardInputService.handleTileClick(r, c, {
             model: this.model,
-            gameStore: this.gameStore,
             gameSessionService: this.gameSessionService,
             gameStateMachine: this.gameStateMachine,
             audioManager: this.audioManager,
@@ -187,10 +219,12 @@ export default class GameController extends cc.Component {
             setProcessing: (value) => {
                 this.isProcessing = value;
             },
-            getNodeAt: (row, col) => this.getNodeAt(row, col),
             activateBooster: (row, col, type) => this.activateBooster(row, col, type),
             tryBlast: (row, col) => this.tryBlast(row, col),
             handleBombAt: (row, col) => this.handleBombClick(row, col),
+            highlightTeleportSelection: (selection) => this.boardSceneService.emphasizeTeleportSelection(selection.r, selection.c),
+            clearTeleportSelectionVisual: (selection) => this.boardSceneService.resetTeleportSelection(selection.r, selection.c),
+            swapTeleportTiles: (first, second, onComplete) => this.boardSceneService.swapTiles(first, second, onComplete),
             onTeleportCompleted: () => this.finishTeleport(),
         });
     }
@@ -209,29 +243,11 @@ export default class GameController extends cc.Component {
 
     private shuffleGrid() {
         this.model.shuffleOnlyColors();
-        this.gridContainer.children.forEach(node => {
-            const comp = node.getComponent(TileComponent);
-            if (!comp) return;
-            const newType = this.model.getTile(comp.gridPos.y, comp.gridPos.x);
-            comp.init(newType, comp.gridPos.y, comp.gridPos.x, (r, c) => this.onTileClick(r, c));
-        });
+        this.boardSceneService.shuffleView(this.model, (r, c) => this.onTileClick(r, c));
     }
 
-    private getNodesByCoords(coords: Array<{ r: number; c: number }>): cc.Node[] {
-        return this.gridContainer.children.filter(node => {
-            const comp = node.getComponent(TileComponent);
-            if (!comp) return false;
-            const cp = comp.gridPos;
-            return coords.some(c => c.r === cp.y && c.c === cp.x);
-        });
-    }
-
-    private getNodeAt(r: number, c: number): cc.Node {
-        return this.gridContainer.children.find(node => {
-            const comp = node.getComponent(TileComponent);
-            if (!comp) return false;
-            return comp.gridPos.y === r && comp.gridPos.x === c;
-        });
+    private getNodeAt(r: number, c: number): cc.Node | null {
+        return this.boardSceneService.getNodeAt(r, c);
     }
 
     private activateBooster(r: number, c: number, type: number) {
@@ -245,7 +261,9 @@ export default class GameController extends cc.Component {
             this.audioManager.play("click");
         } else {
             this.gameStateMachine.enterPlaying();
-            this.boardInputService.clearTeleportSelection();
+            this.boardInputService.clearTeleportSelection((selection) => {
+                this.boardSceneService.resetTeleportSelection(selection.r, selection.c);
+            });
         }
     }
 
@@ -254,7 +272,9 @@ export default class GameController extends cc.Component {
 
         if (active) {
             this.gameStateMachine.enterBombMode();
-            this.boardInputService.clearTeleportSelection();
+            this.boardInputService.clearTeleportSelection((selection) => {
+                this.boardSceneService.resetTeleportSelection(selection.r, selection.c);
+            });
             this.audioManager.play("click");
         } else {
             this.gameStateMachine.enterPlaying();
@@ -265,25 +285,14 @@ export default class GameController extends cc.Component {
         return {
             model: this.model,
             config: this.config,
-            gameStore: this.gameStore,
             gameSessionService: this.gameSessionService,
-            audioManager: this.audioManager,
-            effectManager: this.effectManager,
-            poolManager: this.poolManager,
-            gridPhysicsService: this.gridPhysicsService,
-            gridContainer: this.gridContainer,
+            board: this.createBoardRuntimePort(),
             currentRows: this.currentRows,
             currentCols: this.currentCols,
-            tileSizeY: this.tileSizeY,
             isProcessing: this.isProcessing,
             setProcessing: (value: boolean) => {
                 this.isProcessing = value;
             },
-            getNodeAt: (r: number, c: number) => this.getNodeAt(r, c),
-            getNodesByCoords: (coords: Array<{ r: number; c: number }>) => this.getNodesByCoords(coords),
-            getScreenPosition: (r: number, c: number) => this.getScreenPosition(r, c),
-            onTileClick: (r: number, c: number) => this.onTileClick(r, c),
-            spawnBooster: (r: number, c: number, type: number) => this.spawnBooster(r, c, type),
             finalizePhysics: () => {
                 if (!this.validateBoardState("finalize physics")) {
                     this.isProcessing = false;
@@ -292,7 +301,36 @@ export default class GameController extends cc.Component {
 
                 this.gameProgressionService.finalizePhysics(this.createGameProgressionContext());
             },
-            scheduleOnce: (callback: () => void, delay: number) => this.scheduleOnce(callback, delay),
+        };
+    }
+
+    private createBoardRuntimePort(): BoardRuntimePort {
+        return {
+            hasTileAt: (r, c) => this.boardSceneService.hasTileAt(r, c),
+            countTilesAt: (coords) => this.boardSceneService.countNodesAt(coords),
+            shakeTile: (r, c) => this.boardSceneService.shakeTile(r, c),
+            destroyTileAt: (r, c, onComplete) => this.boardSceneService.destroyTileAt(r, c, onComplete),
+            recycleBoosterAt: (r, c, type) => this.boardSceneService.recycleBoosterAt(r, c, type),
+            spawnBooster: (r, c, type) => this.spawnBooster(r, c, type),
+            getScreenPosition: (r, c) => this.getScreenPosition(r, c),
+            toWorldPosition: (localPosition) => this.gridContainer.convertToWorldSpaceAR(localPosition),
+            spawnCrossFx: (position) => this.effectManager.spawnCrossFX(this.gridContainer, position),
+            spawnExplosionFx: (position, fxType) => this.effectManager.spawnExplosionFX(this.gridContainer, position, fxType),
+            showScore: (position, points) => this.effectManager.showScoreAnimation(position, points),
+            shakeCamera: () => this.effectManager.shakeCamera(),
+            playSound: (name) => this.audioManager.play(name),
+            schedule: (callback, delay) => this.scheduleOnce(callback, delay),
+            processPhysics: (onComplete) => this.gridPhysicsService.process({
+                model: this.model,
+                gridContainer: this.gridContainer,
+                currentRows: this.currentRows,
+                tileSizeY: this.tileSizeY,
+                poolManager: this.poolManager,
+                getNodeAt: (r, c) => this.getNodeAt(r, c),
+                getScreenPosition: (r, c) => this.getScreenPosition(r, c),
+                onTileClick: (r, c) => this.onTileClick(r, c),
+                onComplete,
+            }),
         };
     }
 
@@ -316,9 +354,7 @@ export default class GameController extends cc.Component {
             levelManager: this.levelManager,
             gameSessionService: this.gameSessionService,
             gameProgressionContext: this.createGameProgressionContext(),
-            clearBoard: () => {
-                this.gridContainer.removeAllChildren();
-            },
+            clearBoard: () => this.boardSceneService.clearBoard(),
             setProcessing: (value: boolean) => {
                 this.isProcessing = value;
             },
@@ -328,20 +364,57 @@ export default class GameController extends cc.Component {
         };
     }
 
-    private createBoardViewContext() {
-        return {
-            gridContainer: this.gridContainer,
-            obstaclePrefab: this.obstaclePrefab,
-            config: this.config,
-            poolManager: this.poolManager,
-            tileSizeX: this.tileSizeX,
-            tileSizeY: this.tileSizeY,
-            onTileClick: (r: number, c: number) => this.onTileClick(r, c),
-            scheduleOnce: (callback: () => void, delay: number) => this.scheduleOnce(callback, delay),
-            setProcessing: (value: boolean) => {
-                this.isProcessing = value;
-            },
-        };
+    private initializePresentation(): void {
+        this.boosterButtonTeleport.initialize({
+            gameSignals: this.gameSignals,
+            gameStore: this.gameStore,
+            audioManager: this.audioManager,
+        });
+        this.boosterButtonBomb.initialize({
+            gameSignals: this.gameSignals,
+            gameStore: this.gameStore,
+            audioManager: this.audioManager,
+        });
+
+        const scoreUi = this.findSceneComponent(ScoreUIController);
+        scoreUi?.initialize({
+            gameSignals: this.gameSignals,
+            gameStore: this.gameStore,
+        });
+
+        const gameOverWindow = this.findSceneComponent(GameOverWindow);
+        gameOverWindow?.initialize({
+            gameSignals: this.gameSignals,
+            gameStore: this.gameStore,
+            gameSessionService: this.gameSessionService,
+            audioManager: this.audioManager,
+        });
+
+        const winWindow = this.findSceneComponent(WinWindow);
+        winWindow?.initialize({
+            gameSignals: this.gameSignals,
+            gameStore: this.gameStore,
+            gameSessionService: this.gameSessionService,
+            audioManager: this.audioManager,
+        });
+    }
+
+    private findSceneComponent<T extends cc.Component>(type: { new(): T }): T | null {
+        const scene = cc.director.getScene();
+        if (!scene) {
+            return null;
+        }
+
+        return scene.getComponentInChildren(type);
+    }
+
+    private requireSceneComponent<T extends cc.Component>(type: { new(): T }): T {
+        const component = this.findSceneComponent(type);
+        if (!component) {
+            throw new Error(`Required scene component not found: ${type.name}`);
+        }
+
+        return component;
     }
 
     private validateBoardState(source: string): boolean {
@@ -364,6 +437,10 @@ export default class GameController extends cc.Component {
     }
 
     public onDestroy() {
+        if (!this.gameSignals) {
+            return;
+        }
+
         this.gameSignals.off(GameSignals.EVT_CONTINUE, this.handleContinue, this);
         this.boosterButtonTeleport.node.off(GameSignals.EVT_BOOSTER_TELEPORT, this.onTeleportModeToggle, this);
         this.boosterButtonBomb.node.off(GameSignals.EVT_BOOSTER_BOMB, this.onBombModeToggle, this);

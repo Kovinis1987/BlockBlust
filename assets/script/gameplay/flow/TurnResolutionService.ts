@@ -1,37 +1,21 @@
-import GameConfig from "../../Config/GameConfig";
-import GridModel from "../Board/GridModel";
-import TileComponent from "../../Presentation/Components/TileComponent";
-import AudioManager from "../../Infrastructure/Audio/AudioManager";
-import BoosterResolutionService, {BoosterPlan} from "../Boosters/BoosterResolutionService";
-import EffectManager from "../../Infrastructure/Effects/EffectManager";
-import GameBoardHelper from "../Board/GameBoardHelper";
-import GridPhysicsService from "../Board/GridPhysicsService";
-import GameSessionService from "../Session/GameSessionService";
-import GameStore from "../Session/GameStore";
-import PoolManager from "../../Infrastructure/Pooling/PoolManager";
+import GameConfig from "../../config/GameConfig";
+import GridModel from "../board/GridModel";
+import BoosterResolutionService, {BoosterPlan} from "../boosters/BoosterResolutionService";
+import GameBoardHelper from "../board/GameBoardHelper";
+import GameSessionService from "../session/GameSessionService";
+import {TileType} from "../types/TileType";
+import {BoardRuntimePort} from "./BoardRuntimePort";
 
 export interface TurnResolutionContext {
     model: GridModel;
     config: GameConfig;
-    gameStore: GameStore;
     gameSessionService: GameSessionService;
-    audioManager: AudioManager;
-    effectManager: EffectManager;
-    poolManager: PoolManager;
-    gridPhysicsService: GridPhysicsService;
-    gridContainer: cc.Node;
+    board: BoardRuntimePort;
     currentRows: number;
     currentCols: number;
-    tileSizeY: number;
     isProcessing: boolean;
     setProcessing: (value: boolean) => void;
-    getNodeAt: (r: number, c: number) => cc.Node | null;
-    getNodesByCoords: (coords: Array<{ r: number; c: number }>) => cc.Node[];
-    getScreenPosition: (r: number, c: number) => cc.Vec2;
-    onTileClick: (r: number, c: number) => void;
-    spawnBooster: (r: number, c: number, type: number) => void;
     finalizePhysics: () => void;
-    scheduleOnce: (callback: () => void, delay: number) => void;
 }
 
 interface ExplosionExecutionState {
@@ -44,16 +28,11 @@ export default class TurnResolutionService {
 
         const group = context.model.findGroup(r, c);
         if (group.length < 3) {
-            const node = context.getNodeAt(r, c);
-            if (node) {
-                node.getComponent(TileComponent).shake();
-            }
+            context.board.shakeTile(r, c);
             return;
         }
 
-        const nodesToDestroy = context.getNodesByCoords(group);
-        const tileNode = context.getNodeAt(r, c);
-        if (!tileNode || nodesToDestroy.length !== group.length) {
+        if (!context.board.hasTileAt(r, c) || context.board.countTilesAt(group) !== group.length) {
             cc.error(`[TurnResolutionService] Board desync detected before blast at (${r}, ${c}).`);
             return;
         }
@@ -61,11 +40,12 @@ export default class TurnResolutionService {
         context.gameSessionService.useMove();
 
         this.awardScoreForNodes(
-            nodesToDestroy.map(node => {
-                const comp = node.getComponent(TileComponent);
-                return {node, r: comp.gridPos.y, c: comp.gridPos.x};
-            }),
-            tileNode.getPosition(),
+            group.map(coord => ({
+                r: coord.r,
+                c: coord.c,
+                type: context.model.getTile(coord.r, coord.c),
+            })),
+            context.board.getScreenPosition(r, c),
             context
         );
 
@@ -73,17 +53,18 @@ export default class TurnResolutionService {
         context.model.clearCells(group);
 
         let count = 0;
-        nodesToDestroy.forEach(node => {
-            node.getComponent(TileComponent).destroyTile(() => {
-                context.poolManager.putTile(node);
+        group.forEach(coord => {
+            if (!context.board.destroyTileAt(coord.r, coord.c, () => {
                 count++;
-                if (count === nodesToDestroy.length) {
+                if (count === group.length) {
                     if (boosterData) {
-                        context.spawnBooster(r, c, boosterData.type);
+                        context.board.spawnBooster(r, c, boosterData.type);
                     }
                     this.processGridPhysics(context);
                 }
-            });
+            })) {
+                return;
+            }
         });
     }
 
@@ -92,17 +73,7 @@ export default class TurnResolutionService {
     }
 
     public processGridPhysics(context: TurnResolutionContext): void {
-        context.gridPhysicsService.process({
-            model: context.model,
-            gridContainer: context.gridContainer,
-            currentRows: context.currentRows,
-            tileSizeY: context.tileSizeY,
-            poolManager: context.poolManager,
-            getNodeAt: context.getNodeAt,
-            getScreenPosition: context.getScreenPosition,
-            onTileClick: context.onTileClick,
-            onComplete: context.finalizePhysics,
-        });
+        context.board.processPhysics(context.finalizePhysics);
     }
 
     private activateBoosterInternal(
@@ -139,14 +110,14 @@ export default class TurnResolutionService {
         state: ExplosionExecutionState
     ): void {
         context.setProcessing(true);
-        const pos = context.getScreenPosition(r, c);
+        const pos = context.board.getScreenPosition(r, c);
 
         if (plan.playCrossFx) {
-            context.effectManager.spawnCrossFX(context.gridContainer, pos);
+            context.board.spawnCrossFx(pos);
         }
 
         if (plan.preExplosionFxType !== undefined) {
-            context.effectManager.spawnExplosionFX(context.gridContainer, pos, plan.preExplosionFxType);
+            context.board.spawnExplosionFx(pos, plan.preExplosionFxType);
         }
 
         this.executeExplosion(plan.affected, context, state, {r, c}, plan.fxType);
@@ -160,24 +131,24 @@ export default class TurnResolutionService {
         fxType: number = 0
     ): void {
         state.activeExplosionsCount++;
-        context.effectManager.shakeCamera();
+        context.board.shakeCamera();
 
         if (epicenter) {
             BoosterResolutionService.sortCoordsByEpicenter(coords, epicenter);
             this.removeEpicenterNode(epicenter, fxType, context);
         }
 
-        const nodesToDestroy = context.getNodesByCoords(coords);
-        if (nodesToDestroy.length === 0) {
+        const renderableCoords = coords.filter(coord => context.board.hasTileAt(coord.r, coord.c));
+        if (renderableCoords.length === 0) {
             this.finishExplosionWave(context, state);
             return;
         }
 
-        nodesToDestroy.forEach((node, index) => {
+        renderableCoords.forEach((coord, index) => {
             const delay = index * context.config.animations.blastWaveDelay;
-            context.scheduleOnce(() => {
-                this.processSingleNodeExplosion(node, context, state, epicenter);
-                if (index === nodesToDestroy.length - 1) {
+            context.board.schedule(() => {
+                this.processSingleNodeExplosion(coord.r, coord.c, context, state, epicenter);
+                if (index === renderableCoords.length - 1) {
                     this.finishExplosionWave(context, state);
                 }
             }, delay);
@@ -185,81 +156,70 @@ export default class TurnResolutionService {
     }
 
     private awardScoreForNodes(
-        nodes: Array<{ node: cc.Node; r: number; c: number }>,
-        pos: cc.Vec2,
+        nodes: Array<{ r: number; c: number; type: number }>,
+        localPosition: cc.Vec2,
         context: TurnResolutionContext
     ): void {
-        const worldPos = context.gridContainer.convertToWorldSpaceAR(pos);
-        const normalTiles = nodes.filter(n => {
-            const type = n.node.getComponent(TileComponent).type;
-            return GameBoardHelper.isColorType(type);
-        });
+        const normalTiles = nodes.filter(n => GameBoardHelper.isColorType(n.type));
 
         if (normalTiles.length > 0) {
             const points = normalTiles.length * context.config.economy.scoreTile;
             context.gameSessionService.addScore(points);
-            context.effectManager.showScoreAnimation(worldPos, points);
+            context.board.showScore(context.board.toWorldPosition(localPosition), points);
         }
     }
 
     private removeEpicenterNode(epi: { r: number; c: number }, fxType: number, context: TurnResolutionContext): void {
-        const epiNode = context.getNodeAt(epi.r, epi.c);
-        if (!epiNode) return;
+        if (!context.board.hasTileAt(epi.r, epi.c)) return;
 
-        const type = epiNode.getComponent(TileComponent).type;
-        const pos = context.getScreenPosition(epi.r, epi.c);
+        const type = context.model.getTile(epi.r, epi.c);
+        const pos = context.board.getScreenPosition(epi.r, epi.c);
 
-        context.effectManager.spawnExplosionFX(context.gridContainer, pos, fxType);
+        context.board.spawnExplosionFx(pos, fxType);
         context.model.clearCells([epi]);
-        context.poolManager.putBooster(epiNode, type);
+        context.board.recycleBoosterAt(epi.r, epi.c, type);
     }
 
     private processSingleNodeExplosion(
-        node: cc.Node,
+        r: number,
+        c: number,
         context: TurnResolutionContext,
         state: ExplosionExecutionState,
         epicenter?: { r: number; c: number }
     ): void {
-        if (!cc.isValid(node)) return;
+        const type = context.model.getTile(r, c);
+        if (type === TileType.EMPTY) return;
 
-        const comp = node.getComponent(TileComponent);
-        const {y: r, x: c} = comp.gridPos;
-        const type = comp.type;
-        const pos = context.getScreenPosition(r, c);
+        const pos = context.board.getScreenPosition(r, c);
 
         const isNotEpicenter = !epicenter || (r !== epicenter.r || c !== epicenter.c);
         if (isNotEpicenter) {
             const fx = GameBoardHelper.getEffectTypeForTile(type);
-            context.effectManager.spawnExplosionFX(context.gridContainer, pos, fx);
+            context.board.spawnExplosionFx(pos, fx);
         }
 
         if (GameBoardHelper.isBoosterType(type)) {
-            this.handleBoosterChainReaction(r, c, type, node, context, state, epicenter);
+            this.handleBoosterChainReaction(r, c, type, context, state, epicenter);
         } else {
-            this.handleRegularTileDestruction(node, r, c, context);
+            this.handleRegularTileDestruction(r, c, context);
         }
     }
 
-    private handleRegularTileDestruction(node: cc.Node, r: number, c: number, context: TurnResolutionContext): void {
-        if (!cc.isValid(node) || !node.parent) return;
-
+    private handleRegularTileDestruction(r: number, c: number, context: TurnResolutionContext): void {
         context.model.clearCells([{r, c}]);
-        const localPos = context.getScreenPosition(r, c);
-        const worldPos = context.gridContainer.convertToWorldSpaceAR(localPos);
+        const localPos = context.board.getScreenPosition(r, c);
+        const worldPos = context.board.toWorldPosition(localPos);
         const points = context.config.economy.scoreTile;
         context.gameSessionService.addScore(points);
-        context.effectManager.showScoreAnimation(worldPos, points);
+        context.board.showScore(worldPos, points);
 
-        node.getComponent(TileComponent).destroyTile(() => {
-            context.poolManager.putTile(node);
-        });
+        context.board.destroyTileAt(r, c, () => undefined);
     }
 
     private handleBoosterChainReaction(
         r: number,
         c: number,
         type: number,
-        node: cc.Node,
         context: TurnResolutionContext,
         state: ExplosionExecutionState,
         epicenter?: { r: number; c: number }
@@ -269,7 +229,7 @@ export default class TurnResolutionService {
 
         context.model.clearCells([{r, c}]);
         this.activateBoosterInternal(r, c, type, context, state);
-        context.poolManager.putBooster(node, type);
+        context.board.recycleBoosterAt(r, c, type);
     }
 
     private finishExplosionWave(context: TurnResolutionContext, state: ExplosionExecutionState): void {

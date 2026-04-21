@@ -1,12 +1,15 @@
-import {GameState} from "../../Gameplay/Types/GameState";
-import AudioManager from "../../Infrastructure/Audio/AudioManager";
-import GameSignals from "../../Gameplay/Session/GameSignals";
-import GameStore from "../../Gameplay/Session/GameStore";
-import {registerDefaultServices} from "../../Core/registerDefaultServices";
-import {appContainer} from "../../Core/DiContainer";
-import {SERVICE_TOKENS} from "../../Core/ServiceTokens";
+import {GameState} from "../../gameplay/types/GameState";
+import AudioManager from "../../infrastructure/audio/AudioManager";
+import GameSignals from "../../gameplay/session/GameSignals";
+import GameStore from "../../gameplay/session/GameStore";
 
 const {ccclass, property} = cc._decorator;
+
+export interface BoosterTeleportButtonDependencies {
+    gameSignals: GameSignals;
+    gameStore: GameStore;
+    audioManager: AudioManager;
+}
 
 @ccclass
 export default class BoosterButtonTeleport extends cc.Component {
@@ -23,14 +26,19 @@ export default class BoosterButtonTeleport extends cc.Component {
     private audioManager: AudioManager;
 
     onLoad() {
-        registerDefaultServices();
-        this.gameSignals = appContainer.resolve(SERVICE_TOKENS.gameSignals);
-        this.gameStore = appContainer.resolve(SERVICE_TOKENS.gameStore);
-        this.audioManager = appContainer.resolve(SERVICE_TOKENS.audioManager);
-
         this.originalColor = this.node.color.clone();
         this.node.on(cc.Node.EventType.TOUCH_END, this.onClick, this);
+    }
 
+    public initialize(dependencies: BoosterTeleportButtonDependencies): void {
+        if (this.gameSignals) {
+            this.gameSignals.off(GameSignals.EVT_TELEPORT_CHANGED, this.onCountChanged, this);
+            this.gameSignals.off(GameSignals.EVT_STATE_CHANGED, this.onStateChanged, this);
+        }
+
+        this.gameSignals = dependencies.gameSignals;
+        this.gameStore = dependencies.gameStore;
+        this.audioManager = dependencies.audioManager;
         this.gameSignals.on(GameSignals.EVT_TELEPORT_CHANGED, this.onCountChanged, this);
         this.gameSignals.on(GameSignals.EVT_STATE_CHANGED, this.onStateChanged, this);
 
@@ -70,6 +78,10 @@ export default class BoosterButtonTeleport extends cc.Component {
     }
 
     onDestroy() {
+        if (!this.gameSignals) {
+            return;
+        }
+
         this.gameSignals.off(GameSignals.EVT_TELEPORT_CHANGED, this.onCountChanged, this);
         this.gameSignals.off(GameSignals.EVT_STATE_CHANGED, this.onStateChanged, this);
     }

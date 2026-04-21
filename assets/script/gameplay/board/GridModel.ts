@@ -1,5 +1,5 @@
-import GameConfig from "../../Config/GameConfig";
-import {BOOSTER_TYPES, COLOR_TILES, TileType} from "../Types/TileType";
+import GameConfig from "../../config/GameConfig";
+import {BOOSTER_TYPES, COLOR_TILES, TileType} from "../types/TileType";
 
 type GridCoord = { r: number, c: number };
 type TileMovement = { from: GridCoord, to: GridCoord };

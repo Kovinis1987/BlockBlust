@@ -1,6 +1,6 @@
-import EffectTypes from "../Types/EffectTypes";
-import {TileType} from "../Types/TileType";
-import GameBoardHelper, {GridCoord} from "../Board/GameBoardHelper";
+import EffectTypes from "../types/EffectTypes";
+import {TileType} from "../types/TileType";
+import GameBoardHelper, {GridCoord} from "../board/GameBoardHelper";
 
 export interface BoosterPlan {
     affected: GridCoord[];

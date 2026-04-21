@@ -1,5 +1,5 @@
-import EffectTypes from "../Types/EffectTypes";
-import {TileType} from "../Types/TileType";
+import EffectTypes from "../types/EffectTypes";
+import {TileType} from "../types/TileType";
 
 export type GridCoord = { r: number, c: number };
 
